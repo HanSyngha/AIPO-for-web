@@ -262,13 +262,13 @@ filesRoutes.post('/:id/export', async (req: AuthenticatedRequest, res) => {
     // 댓글 추가
     if (includeComments && file.comments && file.comments.length > 0) {
       markdown += '\n\n---\n\n## Comments\n\n';
-      for (const comment of file.comments) {
-        markdown += `**${comment.user.username}** (${comment.createdAt.toISOString()}):\n`;
+      for (const comment of file.comments as any[]) {
+        markdown += `**${comment.user?.username || 'Unknown'}** (${comment.createdAt.toISOString()}):\n`;
         markdown += `> ${comment.content}\n\n`;
 
         if (comment.replies) {
           for (const reply of comment.replies) {
-            markdown += `  **${reply.user.username}**:\n`;
+            markdown += `  **${reply.user?.username || 'Unknown'}**:\n`;
             markdown += `  > ${reply.content}\n\n`;
           }
         }
