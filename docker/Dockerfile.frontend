@@ -1,22 +1,11 @@
 # Build stage
 FROM node:24-alpine AS builder
 
-# Proxy settings (required for Samsung DS network)
-ENV HTTP_PROXY=http://12.26.204.100:8000
-ENV HTTPS_PROXY=http://12.26.204.100:8000
-ENV http_proxy=http://12.26.204.100:8000
-ENV https_proxy=http://12.26.204.100:8000
-ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
-
-# SSL 인증서 검증 비활성화 (사내 네트워크)
 ENV NODE_TLS_REJECT_UNAUTHORIZED=0
 
 WORKDIR /app
 
-# npm proxy 및 SSL 설정
-RUN npm config set strict-ssl false && \
-    npm config set proxy http://12.26.204.100:8000 && \
-    npm config set https-proxy http://12.26.204.100:8000
+RUN npm config set strict-ssl false
 
 # Copy package files
 COPY frontend/package*.json ./
@@ -30,15 +19,15 @@ COPY frontend/ ./
 # Build arguments for environment variables
 ARG VITE_API_URL=/api
 ARG VITE_WS_URL=
-ARG VITE_SSO_URL=/sso/login
+ARG VITE_SSO_URL=https://genai.samsungds.net:36810
 
 # Set environment variables for build
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 ENV VITE_SSO_URL=$VITE_SSO_URL
 
-# Build the app (use npx for tsc and vite)
-RUN npx tsc && npx vite build
+# Build the app
+RUN npx tsc -b && npx vite build
 
 # Production stage - serve with nginx
 FROM nginx:alpine AS production

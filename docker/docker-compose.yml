@@ -1,5 +1,15 @@
 version: '3.8'
 
+# Proxy 설정 (Dashboard와 동일 패턴)
+x-proxy-env: &proxy-env
+  HTTP_PROXY: ${HTTP_PROXY:-}
+  HTTPS_PROXY: ${HTTPS_PROXY:-}
+  NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,genai.samsungds.net}
+  http_proxy: ${HTTP_PROXY:-}
+  https_proxy: ${HTTPS_PROXY:-}
+  no_proxy: ${NO_PROXY:-localhost,127.0.0.1,genai.samsungds.net}
+  NODE_TLS_REJECT_UNAUTHORIZED: "0"
+
 services:
   # PostgreSQL Database
   postgres:
@@ -45,6 +55,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
+      args:
+        <<: *proxy-env
     container_name: aipo-api
     restart: unless-stopped
     depends_on:
@@ -53,6 +65,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      <<: *proxy-env
       NODE_ENV: production
       PORT: 16002
       DATABASE_URL: postgresql://${POSTGRES_USER:-aipo}:${POSTGRES_PASSWORD:-aipo_secret}@postgres:5432/${POSTGRES_DB:-aipo_web}
@@ -81,6 +94,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.frontend
       args:
+        <<: *proxy-env
         VITE_API_URL: /api
         VITE_WS_URL: ""
         VITE_SSO_URL: https://genai.samsungds.net:36810

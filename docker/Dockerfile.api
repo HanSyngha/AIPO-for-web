@@ -1,25 +1,14 @@
 # Build stage
 FROM node:24-alpine AS builder
 
-# Proxy settings (required for Samsung DS network)
-ENV HTTP_PROXY=http://12.26.204.100:8000
-ENV HTTPS_PROXY=http://12.26.204.100:8000
-ENV http_proxy=http://12.26.204.100:8000
-ENV https_proxy=http://12.26.204.100:8000
-ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
-
-# SSL 인증서 검증 비활성화 (사내 네트워크)
-ENV NODE_TLS_REJECT_UNAUTHORIZED=0
-
 # Alpine apk를 http로 변경 (SSL 문제 우회)
 RUN sed -i 's/https/http/' /etc/apk/repositories
 
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
+
 WORKDIR /app
 
-# npm proxy 및 SSL 설정
-RUN npm config set strict-ssl false && \
-    npm config set proxy http://12.26.204.100:8000 && \
-    npm config set https-proxy http://12.26.204.100:8000
+RUN npm config set strict-ssl false
 
 # Copy package files
 COPY api/package*.json ./
@@ -43,12 +32,6 @@ RUN npx tsc
 # Production stage
 FROM node:24-alpine AS production
 
-# Proxy settings
-ENV HTTP_PROXY=http://12.26.204.100:8000
-ENV HTTPS_PROXY=http://12.26.204.100:8000
-ENV http_proxy=http://12.26.204.100:8000
-ENV https_proxy=http://12.26.204.100:8000
-ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
 ENV NODE_TLS_REJECT_UNAUTHORIZED=0
 
 WORKDIR /app
