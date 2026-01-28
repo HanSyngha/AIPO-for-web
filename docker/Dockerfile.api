@@ -4,6 +4,9 @@ FROM node:24-alpine AS builder
 # Alpine apk를 http로 변경 (SSL 문제 우회)
 RUN sed -i 's/https/http/' /etc/apk/repositories
 
+# Prisma용 OpenSSL 설치
+RUN apk add --no-cache openssl
+
 ENV NODE_TLS_REJECT_UNAUTHORIZED=0
 
 WORKDIR /app
@@ -34,6 +37,9 @@ FROM node:24-alpine AS production
 
 ENV NODE_TLS_REJECT_UNAUTHORIZED=0
 
+# Prisma용 OpenSSL 설치
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Copy node_modules from builder (includes all dependencies)
@@ -48,9 +54,10 @@ COPY --from=builder /app/dist ./dist
 # Copy package.json for reference
 COPY api/package*.json ./
 
-# Create non-root user
+# Create non-root user & node_modules 권한 부여
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
 USER nodejs
 
