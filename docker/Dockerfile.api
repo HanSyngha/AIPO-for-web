@@ -8,14 +8,18 @@ ENV http_proxy=http://12.26.204.100:8000
 ENV https_proxy=http://12.26.204.100:8000
 ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
 
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl
+# SSL 인증서 검증 비활성화 (사내 네트워크)
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
+
+# Alpine apk를 http로 변경 (SSL 문제 우회)
+RUN sed -i 's/https/http/' /etc/apk/repositories
 
 WORKDIR /app
 
-# SSL 인증서 검증 비활성화 (사내 네트워크)
-ENV NODE_TLS_REJECT_UNAUTHORIZED=0
-RUN npm config set strict-ssl false
+# npm proxy 및 SSL 설정
+RUN npm config set strict-ssl false && \
+    npm config set proxy http://12.26.204.100:8000 && \
+    npm config set https-proxy http://12.26.204.100:8000
 
 # Copy package files
 COPY api/package*.json ./
@@ -45,9 +49,7 @@ ENV HTTPS_PROXY=http://12.26.204.100:8000
 ENV http_proxy=http://12.26.204.100:8000
 ENV https_proxy=http://12.26.204.100:8000
 ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
-
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
 
 WORKDIR /app
 

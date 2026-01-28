@@ -8,11 +8,15 @@ ENV http_proxy=http://12.26.204.100:8000
 ENV https_proxy=http://12.26.204.100:8000
 ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
 
-WORKDIR /app
-
 # SSL 인증서 검증 비활성화 (사내 네트워크)
 ENV NODE_TLS_REJECT_UNAUTHORIZED=0
-RUN npm config set strict-ssl false
+
+WORKDIR /app
+
+# npm proxy 및 SSL 설정
+RUN npm config set strict-ssl false && \
+    npm config set proxy http://12.26.204.100:8000 && \
+    npm config set https-proxy http://12.26.204.100:8000
 
 # Copy package files
 COPY frontend/package*.json ./
