@@ -1,0 +1,84 @@
+# Build stage
+FROM node:24-alpine AS builder
+
+# Proxy settings (required for Samsung DS network)
+ENV HTTP_PROXY=http://12.26.204.100:8000
+ENV HTTPS_PROXY=http://12.26.204.100:8000
+ENV http_proxy=http://12.26.204.100:8000
+ENV https_proxy=http://12.26.204.100:8000
+ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+# SSL 인증서 검증 비활성화 (사내 네트워크)
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
+RUN npm config set strict-ssl false
+
+# Copy package files
+COPY api/package*.json ./
+
+# Install ALL dependencies (including devDependencies for build)
+RUN npm install --include=dev
+
+# Copy prisma schema
+COPY api/prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy source files
+COPY api/src ./src/
+COPY api/tsconfig.json ./
+
+# Build TypeScript
+RUN npx tsc
+
+# Production stage
+FROM node:24-alpine AS production
+
+# Proxy settings
+ENV HTTP_PROXY=http://12.26.204.100:8000
+ENV HTTPS_PROXY=http://12.26.204.100:8000
+ENV http_proxy=http://12.26.204.100:8000
+ENV https_proxy=http://12.26.204.100:8000
+ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+# Copy node_modules from builder (includes all dependencies)
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy Prisma schema
+COPY --from=builder /app/prisma ./prisma
+
+# Copy built application
+COPY --from=builder /app/dist ./dist
+
+# Copy package.json for reference
+COPY api/package*.json ./
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+USER nodejs
+
+# Expose port
+EXPOSE 16002
+
+# Environment variables
+ENV NODE_ENV=production
+ENV PORT=16002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:16002/health || exit 1
+
+# Run prisma db push at startup to sync schema, then start the server
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]

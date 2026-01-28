@@ -1,0 +1,432 @@
+/**
+ * Requests Routes
+ *
+ * 노트 입력/검색 요청 관련 엔드포인트
+ */
+
+import { Router } from 'express';
+import { prisma, io } from '../index.js';
+import { authenticateToken, AuthenticatedRequest, loadUserId, isSuperAdmin, requireTeamAdminOrHigher } from '../middleware/auth.js';
+import { inputRateLimiter, searchRateLimiter } from '../middleware/rateLimit.js';
+import { addToQueue, getQueuePosition, cancelRequest } from '../services/queue/bull.service.js';
+
+export const requestsRoutes = Router();
+
+requestsRoutes.use(authenticateToken);
+requestsRoutes.use(loadUserId);
+
+/**
+ * 공간 접근 권한 확인
+ */
+async function canAccessSpace(userId: string, loginid: string, spaceId: string): Promise<boolean> {
+  if (isSuperAdmin(loginid)) return true;
+
+  const space = await prisma.space.findUnique({
+    where: { id: spaceId },
+    include: {
+      user: { select: { id: true } },
+      team: {
+        include: {
+          members: { select: { userId: true } },
+        },
+      },
+    },
+  });
+
+  if (!space) return false;
+  if (space.userId === userId) return true;
+  if (space.team?.members.some(m => m.userId === userId)) return true;
+
+  return false;
+}
+
+/**
+ * @swagger
+ * /requests/input:
+ *   post:
+ *     summary: 노트 입력 요청 (뭐든지 입력)
+ *     description: |
+ *       자유 형식의 텍스트를 입력하면 AI가 자동으로 정리하여 노트를 생성합니다.
+ *       Rate Limit: **분당 5회**
+ *     tags: [Requests]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - spaceId
+ *               - input
+ *             properties:
+ *               spaceId:
+ *                 type: string
+ *                 description: 저장할 공간 ID
+ *               input:
+ *                 type: string
+ *                 description: 정리할 내용 (최대 100,000자)
+ *           example:
+ *             spaceId: "clxxx..."
+ *             input: "오늘 회의 내용 정리해줘. 참석자는 김팀장, 이과장..."
+ *     responses:
+ *       200:
+ *         description: 요청 생성 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 request:
+ *                   $ref: '#/components/schemas/Request'
+ *       400:
+ *         description: 잘못된 요청
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       429:
+ *         $ref: '#/components/responses/RateLimited'
+ */
+requestsRoutes.post('/input', inputRateLimiter, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { spaceId, input } = req.body;
+
+    if (!spaceId || !input) {
+      res.status(400).json({ error: 'spaceId and input are required' });
+      return;
+    }
+
+    if (input.length > 100000) {
+      res.status(400).json({ error: 'Input is too long. Maximum 100,000 characters.' });
+      return;
+    }
+
+    const canAccess = await canAccessSpace(req.userId!, req.user!.loginid, spaceId);
+    if (!canAccess) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // 요청 생성
+    const request = await prisma.request.create({
+      data: {
+        userId: req.userId!,
+        spaceId,
+        type: 'INPUT',
+        input,
+        status: 'PENDING',
+      },
+    });
+
+    // 큐에 추가
+    const position = await addToQueue(request.id, spaceId, 'INPUT');
+
+    // 감사 로그
+    await prisma.auditLog.create({
+      data: {
+        userId: req.userId!,
+        spaceId,
+        action: 'CREATE_NOTE',
+        targetType: 'REQUEST',
+        targetId: request.id,
+        details: { inputLength: input.length },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    // WebSocket으로 큐 상태 전송
+    io.to(`user:${req.userId}`).emit('queue:update', {
+      requestId: request.id,
+      position,
+      status: 'waiting',
+    });
+
+    res.status(201).json({
+      request: {
+        id: request.id,
+        status: request.status,
+        position,
+        createdAt: request.createdAt,
+      },
+      message: '입력이 접수되었습니다. 잠시 후 AI가 정리해드립니다.',
+    });
+  } catch (error) {
+    console.error('Input request error:', error);
+    res.status(500).json({ error: 'Failed to process input request' });
+  }
+});
+
+/**
+ * POST /requests/search
+ * 검색 요청 (뭐든지 검색)
+ */
+requestsRoutes.post('/search', searchRateLimiter, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { spaceId, query } = req.body;
+
+    if (!spaceId || !query) {
+      res.status(400).json({ error: 'spaceId and query are required' });
+      return;
+    }
+
+    if (query.length > 1000) {
+      res.status(400).json({ error: 'Query is too long. Maximum 1,000 characters.' });
+      return;
+    }
+
+    const canAccess = await canAccessSpace(req.userId!, req.user!.loginid, spaceId);
+    if (!canAccess) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // 요청 생성
+    const request = await prisma.request.create({
+      data: {
+        userId: req.userId!,
+        spaceId,
+        type: 'SEARCH',
+        input: query,
+        status: 'PENDING',
+      },
+    });
+
+    // 큐에 추가
+    const position = await addToQueue(request.id, spaceId, 'SEARCH');
+
+    res.status(201).json({
+      request: {
+        id: request.id,
+        status: request.status,
+        position,
+        createdAt: request.createdAt,
+      },
+      message: '검색을 시작합니다.',
+    });
+  } catch (error) {
+    console.error('Search request error:', error);
+    res.status(500).json({ error: 'Failed to process search request' });
+  }
+});
+
+/**
+ * POST /requests/refactor
+ * 폴더 구조 리팩토링 요청 (관리자 전용)
+ */
+requestsRoutes.post('/refactor', requireTeamAdminOrHigher, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { spaceId, instructions } = req.body;
+
+    if (!spaceId) {
+      res.status(400).json({ error: 'spaceId is required' });
+      return;
+    }
+
+    // 팀 관리자의 경우 본인 팀만 리팩토링 가능
+    if (!req.isSuperAdmin) {
+      const space = await prisma.space.findUnique({
+        where: { id: spaceId },
+        select: { teamId: true },
+      });
+
+      if (!space?.teamId || !req.teamAdminTeamIds?.includes(space.teamId)) {
+        res.status(403).json({ error: 'You can only refactor your team space' });
+        return;
+      }
+    }
+
+    // 요청 생성
+    const request = await prisma.request.create({
+      data: {
+        userId: req.userId!,
+        spaceId,
+        type: 'REFACTOR',
+        input: instructions || 'Optimize folder structure',
+        status: 'PENDING',
+      },
+    });
+
+    // 큐에 추가
+    const position = await addToQueue(request.id, spaceId, 'REFACTOR');
+
+    // 감사 로그
+    await prisma.auditLog.create({
+      data: {
+        userId: req.userId!,
+        spaceId,
+        action: 'REFACTOR_STRUCTURE',
+        targetType: 'SPACE',
+        targetId: spaceId,
+        details: { requestId: request.id },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    res.status(201).json({
+      request: {
+        id: request.id,
+        status: request.status,
+        position,
+        createdAt: request.createdAt,
+      },
+      message: '폴더 구조 최적화 작업이 시작됩니다. 완료 시 알려드립니다.',
+    });
+  } catch (error) {
+    console.error('Refactor request error:', error);
+    res.status(500).json({ error: 'Failed to process refactor request' });
+  }
+});
+
+/**
+ * GET /requests/:id
+ * 요청 상태 조회
+ */
+requestsRoutes.get('/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const request = await prisma.request.findUnique({
+      where: { id },
+      include: {
+        logs: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
+      },
+    });
+
+    if (!request) {
+      res.status(404).json({ error: 'Request not found' });
+      return;
+    }
+
+    // 본인 요청만 조회 가능 (Super Admin 제외)
+    if (!isSuperAdmin(req.user!.loginid) && request.userId !== req.userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // 큐에서 현재 위치 조회
+    let position: number | null = null;
+    if (request.status === 'PENDING') {
+      position = await getQueuePosition(request.id, request.spaceId);
+    }
+
+    res.json({
+      request: {
+        id: request.id,
+        type: request.type,
+        status: request.status,
+        position,
+        input: request.input.substring(0, 200) + (request.input.length > 200 ? '...' : ''),
+        result: request.result,
+        error: request.error,
+        iterations: request.iterations,
+        tokensUsed: request.tokensUsed,
+        createdAt: request.createdAt,
+        startedAt: request.startedAt,
+        completedAt: request.completedAt,
+      },
+      logs: request.logs.map(log => ({
+        id: log.id,
+        iteration: log.iteration,
+        tool: log.tool,
+        success: log.success,
+        duration: log.duration,
+        createdAt: log.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Get request error:', error);
+    res.status(500).json({ error: 'Failed to get request' });
+  }
+});
+
+/**
+ * DELETE /requests/:id
+ * 요청 취소 (대기 중인 요청만)
+ */
+requestsRoutes.delete('/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const request = await prisma.request.findUnique({
+      where: { id },
+    });
+
+    if (!request) {
+      res.status(404).json({ error: 'Request not found' });
+      return;
+    }
+
+    if (!isSuperAdmin(req.user!.loginid) && request.userId !== req.userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    if (request.status !== 'PENDING') {
+      res.status(400).json({ error: 'Only pending requests can be cancelled' });
+      return;
+    }
+
+    // 큐에서 제거
+    await cancelRequest(request.id, request.spaceId);
+
+    // 상태 업데이트
+    await prisma.request.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+
+    res.json({
+      success: true,
+      message: '요청이 취소되었습니다.',
+    });
+  } catch (error) {
+    console.error('Cancel request error:', error);
+    res.status(500).json({ error: 'Failed to cancel request' });
+  }
+});
+
+/**
+ * GET /requests/queue-status
+ * 큐 전체 상태 조회
+ */
+requestsRoutes.get('/queue-status', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { spaceId } = req.query;
+
+    if (!spaceId) {
+      res.status(400).json({ error: 'spaceId is required' });
+      return;
+    }
+
+    const canAccess = await canAccessSpace(req.userId!, req.user!.loginid, spaceId as string);
+    if (!canAccess) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // 대기 중 & 처리 중 요청 조회
+    const pending = await prisma.request.count({
+      where: { spaceId: spaceId as string, status: 'PENDING' },
+    });
+
+    const processing = await prisma.request.count({
+      where: { spaceId: spaceId as string, status: 'PROCESSING' },
+    });
+
+    res.json({
+      queue: {
+        pending,
+        processing,
+        total: pending + processing,
+      },
+    });
+  } catch (error) {
+    console.error('Get queue status error:', error);
+    res.status(500).json({ error: 'Failed to get queue status' });
+  }
+});

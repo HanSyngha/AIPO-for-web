@@ -1,0 +1,314 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 사용자 관련 ====================
+
+model User {
+  id           String   @id @default(cuid())
+  loginid      String   @unique
+  username     String
+  deptname     String
+  businessUnit String
+  createdAt    DateTime @default(now())
+  lastActive   DateTime @default(now())
+
+  personalSpace   Space?       @relation("PersonalSpace")
+  teamMemberships TeamMember[]
+  teamAdmins      TeamAdmin[]
+  comments        Comment[]
+  requests        Request[]
+  auditLogs       AuditLog[]
+
+  @@index([loginid])
+  @@index([deptname])
+  @@index([businessUnit])
+}
+
+model Team {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  displayName  String
+  businessUnit String
+  createdAt    DateTime @default(now())
+
+  space   Space?       @relation("TeamSpace")
+  members TeamMember[]
+  admins  TeamAdmin[]
+
+  @@index([name])
+  @@index([businessUnit])
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  userId   String
+  teamId   String
+  joinedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([teamId])
+}
+
+model TeamAdmin {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  grantedAt DateTime @default(now())
+  grantedBy String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([teamId])
+}
+
+// ==================== 공간/폴더/파일 ====================
+
+model Space {
+  id        String    @id @default(cuid())
+  type      SpaceType
+  userId    String?   @unique
+  teamId    String?   @unique
+  createdAt DateTime  @default(now())
+
+  user      User?      @relation("PersonalSpace", fields: [userId], references: [id])
+  team      Team?      @relation("TeamSpace", fields: [teamId], references: [id])
+  folders   Folder[]
+  files     File[]
+  requests  Request[]
+  auditLogs AuditLog[]
+
+  @@index([type])
+}
+
+enum SpaceType {
+  PERSONAL
+  TEAM
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  path      String
+  spaceId   String
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  space    Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  parent   Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children Folder[] @relation("FolderHierarchy")
+  files    File[]
+
+  @@unique([spaceId, path])
+  @@index([spaceId])
+  @@index([parentId])
+}
+
+model File {
+  id        String    @id @default(cuid())
+  name      String
+  path      String
+  spaceId   String
+  folderId  String?
+  createdBy String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  space    Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  folder   Folder?       @relation(fields: [folderId], references: [id])
+  versions FileVersion[]
+  comments Comment[]
+
+  @@unique([spaceId, path])
+  @@index([spaceId])
+  @@index([folderId])
+  @@index([deletedAt])
+  @@index([createdBy])
+}
+
+model FileVersion {
+  id        String   @id @default(cuid())
+  fileId    String
+  language  Language
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  file      File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  histories History[]
+
+  @@unique([fileId, language])
+  @@index([fileId])
+}
+
+enum Language {
+  KO
+  EN
+  CN
+}
+
+model History {
+  id            String   @id @default(cuid())
+  fileVersionId String
+  content       String   @db.Text
+  changedAt     DateTime @default(now())
+  changedBy     String
+  expiresAt     DateTime
+
+  fileVersion FileVersion @relation(fields: [fileVersionId], references: [id], onDelete: Cascade)
+
+  @@index([fileVersionId])
+  @@index([expiresAt])
+  @@index([changedBy])
+}
+
+// ==================== 댓글 ====================
+
+model Comment {
+  id        String   @id @default(cuid())
+  fileId    String
+  blockId   String
+  userId    String
+  content   String   @db.Text
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  file    File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id])
+  parent  Comment?  @relation("CommentThread", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentThread")
+
+  @@index([fileId])
+  @@index([blockId])
+  @@index([userId])
+}
+
+// ==================== 요청/큐 ====================
+
+model Request {
+  id          String        @id @default(cuid())
+  userId      String
+  spaceId     String
+  type        RequestType
+  input       String        @db.Text
+  status      RequestStatus @default(PENDING)
+  position    Int?
+  result      String?       @db.Text
+  error       String?
+  retryCount  Int           @default(0)
+  iterations  Int           @default(0)
+  tokensUsed  Int           @default(0)
+  createdAt   DateTime      @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  user  User         @relation(fields: [userId], references: [id])
+  space Space        @relation(fields: [spaceId], references: [id])
+  logs  RequestLog[]
+
+  @@index([userId])
+  @@index([spaceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum RequestType {
+  INPUT
+  SEARCH
+  REFACTOR
+}
+
+enum RequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model RequestLog {
+  id        String   @id @default(cuid())
+  requestId String
+  iteration Int
+  tool      String
+  params    String   @db.Text
+  result    String?  @db.Text
+  success   Boolean
+  duration  Int?
+  tokens    Int?
+  createdAt DateTime @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+// ==================== 감사 로그 ====================
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String
+  spaceId    String?
+  action     AuditAction
+  targetType String
+  targetId   String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  timestamp  DateTime    @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  space Space? @relation(fields: [spaceId], references: [id])
+
+  @@index([userId])
+  @@index([spaceId])
+  @@index([action])
+  @@index([timestamp])
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  CREATE_NOTE
+  UPDATE_NOTE
+  DELETE_NOTE
+  MOVE_NOTE
+  RENAME_NOTE
+  CREATE_FOLDER
+  DELETE_FOLDER
+  RENAME_FOLDER
+  CREATE_COMMENT
+  UPDATE_COMMENT
+  DELETE_COMMENT
+  RESTORE_FROM_TRASH
+  PERMANENT_DELETE
+  REFACTOR_STRUCTURE
+  EXPORT_NOTE
+  SHARE_LINK
+}
+
+// ==================== 사용자 설정 ====================
+
+model UserSetting {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  language  String   @default("ko")
+  theme     String   @default("light")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}

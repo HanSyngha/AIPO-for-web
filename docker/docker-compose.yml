@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aipo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aipo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aipo_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-aipo_web}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "16003:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aipo} -d ${POSTGRES_DB:-aipo_web}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aipo-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: aipo-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "16004:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aipo-network
+
+  # API Server
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: aipo-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 16002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aipo}:${POSTGRES_PASSWORD:-aipo_secret}@postgres:5432/${POSTGRES_DB:-aipo_web}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SSO_PUBLIC_KEY: ${SSO_PUBLIC_KEY:-}
+      LLM_PROXY_URL: ${LLM_PROXY_URL:-http://dashboard-api:3000/proxy/chat/completions}
+      LLM_SERVICE_ID: ${LLM_SERVICE_ID:-aipo-web}
+      KNOX_MAIL_API_URL: ${KNOX_MAIL_API_URL:-}
+      KNOX_MAIL_API_KEY: ${KNOX_MAIL_API_KEY:-}
+    volumes:
+      - api_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - aipo-network
+
+  # Frontend (Nginx)
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL: ""
+        VITE_SSO_URL: /sso/login
+    container_name: aipo-frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "16001:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - aipo-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  api_logs:
+    driver: local
+
+networks:
+  aipo-network:
+    driver: bridge

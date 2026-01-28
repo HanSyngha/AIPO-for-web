@@ -1,0 +1,35 @@
+{
+  "name": "aipo-web",
+  "version": "1.0.0",
+  "description": "AIPO for Web - AI-powered knowledge sharing service",
+  "private": true,
+  "workspaces": [
+    "api",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
+    "dev:api": "npm run dev -w @aipo-web/api",
+    "dev:frontend": "npm run dev -w @aipo-web/frontend",
+    "build": "npm run build -w @aipo-web/api && npm run build -w @aipo-web/frontend",
+    "build:api": "npm run build -w @aipo-web/api",
+    "build:frontend": "npm run build -w @aipo-web/frontend",
+    "start": "npm run start -w @aipo-web/api",
+    "lint": "npm run lint -ws",
+    "typecheck": "npm run typecheck -ws",
+    "db:generate": "npm run db:generate -w @aipo-web/api",
+    "db:push": "npm run db:push -w @aipo-web/api",
+    "db:migrate": "npm run db:migrate -w @aipo-web/api",
+    "db:studio": "npm run db:studio -w @aipo-web/api",
+    "docker:build": "docker-compose -f docker/docker-compose.yml build",
+    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
