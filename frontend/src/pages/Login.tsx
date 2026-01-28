@@ -85,11 +85,11 @@ export default function Login() {
     }
   }, [user, navigate]);
 
-  // Handle SSO callback
+  // Handle SSO callback (Dashboard와 동일한 플로우)
   useEffect(() => {
-    const ssoToken = searchParams.get('token');
-    if (ssoToken) {
-      handleSSOLogin(ssoToken);
+    const data = searchParams.get('data');
+    if (data) {
+      handleSSOCallback(data);
     } else {
       checkExistingSession();
     }
@@ -112,27 +112,51 @@ export default function Login() {
     }
   };
 
-  const handleSSOLogin = async (ssoToken: string) => {
+  // SSO 콜백 처리 (Dashboard와 동일)
+  const handleSSOCallback = async (dataString: string) => {
     setIsLoggingIn(true);
     try {
-      const response = await authApi.login(ssoToken);
-      localStorage.setItem('aipo_token', response.data.token);
-      setUser(response.data);
+      // Parse SSO data
+      const decodedData = decodeURIComponent(dataString);
+      const ssoData = JSON.parse(decodedData);
+
+      // Generate sso token (Unicode-safe base64 encoding)
+      const jsonData = JSON.stringify({
+        loginid: ssoData.loginid,
+        username: ssoData.username,
+        deptname: ssoData.deptname || '',
+        timestamp: Date.now(),
+      });
+      const ssoToken = btoa(unescape(encodeURIComponent(jsonData)));
+
+      // Exchange SSO data for session token
+      const response = await authApi.login(`sso.${ssoToken}`);
+      const { user, sessionToken } = response.data;
+
+      localStorage.setItem('aipo_token', sessionToken);
+      setUser(user);
+
+      // Clear URL params
+      window.history.replaceState({}, '', window.location.pathname);
       navigate('/home');
     } catch (error: any) {
-      console.error('SSO login failed:', error);
+      console.error('SSO callback error:', error);
       showToast.error(
-        error.response?.data?.error || 'Login failed. Please try again.'
+        error.response?.data?.error || 'SSO 인증 처리 중 오류가 발생했습니다.'
       );
       setIsLoggingIn(false);
+      // Clear URL params on error too
+      window.history.replaceState({}, '', window.location.pathname);
     }
   };
 
   const handleLogin = () => {
-    // Redirect to SSO
-    const ssoUrl = import.meta.env.VITE_SSO_URL || '/sso/login';
-    const callbackUrl = `${window.location.origin}/?callback=true`;
-    window.location.href = `${ssoUrl}?redirect=${encodeURIComponent(callbackUrl)}`;
+    // SSO redirect (Dashboard와 동일)
+    const SSO_BASE_URL = import.meta.env.VITE_SSO_URL || 'https://genai.samsungds.net:36810';
+    const redirectUrl = window.location.origin + window.location.pathname;
+    const ssoUrl = new URL('/direct_sso', SSO_BASE_URL);
+    ssoUrl.searchParams.set('redirect_url', redirectUrl);
+    window.location.href = ssoUrl.toString();
   };
 
   const toggleTheme = () => {

@@ -5,10 +5,11 @@ node_modules/
 dist/
 .cache/
 
-# Environment files
-.env
+# Environment files (keep .env for easy deployment)
 .env.local
 .env.*.local
+# Note: .env files are committed for easy deployment
+# Override sensitive values in production
 
 # IDE
 .vscode/
@@ -32,5 +33,4 @@ coverage/
 *.db
 *.db-journal
 
-# Docker
-docker/.env
+# Docker (keep docker/.env for easy deployment)

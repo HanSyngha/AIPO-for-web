@@ -58,11 +58,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-aipo}:${POSTGRES_PASSWORD:-aipo_secret}@postgres:5432/${POSTGRES_DB:-aipo_web}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      SSO_PUBLIC_KEY: ${SSO_PUBLIC_KEY:-}
-      LLM_PROXY_URL: ${LLM_PROXY_URL:-http://dashboard-api:3000/proxy/chat/completions}
+      DEVELOPERS: ${DEVELOPERS:-}
+      LLM_PROXY_URL: ${LLM_PROXY_URL:-http://a2g.samsungds.net:4090/proxy/chat/completions}
       LLM_SERVICE_ID: ${LLM_SERVICE_ID:-aipo-web}
-      KNOX_MAIL_API_URL: ${KNOX_MAIL_API_URL:-}
+      KNOX_MAIL_API_URL: ${KNOX_MAIL_API_URL:-http://genai.samsungds.net:20080/knox/mail/send}
       KNOX_MAIL_API_KEY: ${KNOX_MAIL_API_KEY:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://a2g.samsungds.net:16001}
     volumes:
       - api_logs:/app/logs
     healthcheck:
@@ -82,7 +83,7 @@ services:
       args:
         VITE_API_URL: /api
         VITE_WS_URL: ""
-        VITE_SSO_URL: /sso/login
+        VITE_SSO_URL: https://genai.samsungds.net:36810
     container_name: aipo-frontend
     restart: unless-stopped
     depends_on:
