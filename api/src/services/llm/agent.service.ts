@@ -25,19 +25,28 @@ interface ModelConfig {
 
 /**
  * Dashboard /v1/models API에서 첫 번째 사용 가능한 모델 조회
+ * user 정보가 있으면 사업부 필터링된 모델 목록을 받음
  */
-async function fetchFirstAvailableModel(): Promise<string | null> {
+async function fetchFirstAvailableModel(
+  user?: { loginid: string; username: string; deptname: string }
+): Promise<string | null> {
   try {
     const baseUrl = LLM_PROXY_URL
       .replace(/\/chat\/completions$/, '')
       .replace(/\/v1$/, '');
     const modelsUrl = `${baseUrl}/v1/models`;
-    const response = await fetch(modelsUrl, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Service-Id': LLM_SERVICE_ID,
-      },
-    });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Service-Id': LLM_SERVICE_ID,
+    };
+    if (user) {
+      headers['X-User-Id'] = user.loginid;
+      headers['X-User-Name'] = encodeURIComponent(user.username);
+      headers['X-User-Dept'] = encodeURIComponent(user.deptname);
+    }
+
+    const response = await fetch(modelsUrl, { headers });
     if (response.ok) {
       const data = await response.json() as any;
       const models = data.data || [];
@@ -53,8 +62,11 @@ async function fetchFirstAvailableModel(): Promise<string | null> {
 
 /**
  * Redis에서 모델 설정 조회. 없으면 Dashboard API에서 동적으로 가져옴
+ * user 정보가 있으면 사업부 필터링된 모델 목록에서 선택
  */
-async function getModelConfig(): Promise<ModelConfig> {
+async function getModelConfig(
+  user?: { loginid: string; username: string; deptname: string }
+): Promise<ModelConfig> {
   try {
     const configStr = await redis.get(MODEL_CONFIG_KEY);
     if (configStr) {
@@ -71,7 +83,7 @@ async function getModelConfig(): Promise<ModelConfig> {
   }
 
   // Redis에 설정이 없으면 Dashboard API에서 첫 번째 모델 사용
-  const firstModel = await fetchFirstAvailableModel();
+  const firstModel = await fetchFirstAvailableModel(user);
   if (firstModel) {
     return { defaultModel: firstModel, fallbackModels: [] };
   }
@@ -305,7 +317,7 @@ async function callLLM(
   messages: LLMMessage[],
   user: { loginid: string; username: string; deptname: string }
 ): Promise<LLMResponse> {
-  const config = await getModelConfig();
+  const config = await getModelConfig(user);
   const modelsToTry = [config.defaultModel, ...config.fallbackModels];
 
   let lastError: Error | null = null;
@@ -347,8 +359,8 @@ export async function runAgentLoop(
   // 공간 트리 구조 조회
   const treeStructure = await getTreeStructure(spaceId);
 
-  // 세션 초기화 (Redis에서 설정된 모델 사용)
-  const modelConfig = await getModelConfig();
+  // 세션 초기화 (Redis에서 설정된 모델 사용, 사업부 필터링 반영)
+  const modelConfig = await getModelConfig(request.user);
   const session = createAgentSession(modelConfig.defaultModel);
 
   // 초기 메시지
