@@ -187,7 +187,7 @@ async function callLLMWithModel(
   user: { loginid: string; username: string; deptname: string },
   model: string
 ): Promise<LLMResponse> {
-  const response = await fetch(`${LLM_PROXY_URL}/chat/completions`, {
+  const response = await fetch(LLM_PROXY_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

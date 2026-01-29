@@ -565,8 +565,7 @@ const LLM_SERVICE_ID = process.env.LLM_SERVICE_ID || 'aipo-web';
 adminRoutes.get('/models', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     // LLM_PROXY_URL에서 base origin 추출 후 /v1/models 호출
-    // e.g. "http://host:4090/proxy/chat/completions" → "http://host:4090/v1/models"
-    // e.g. "http://localhost:3400/api/v1" → "http://localhost:3400/api/v1/models"
+    // e.g. "http://host:4090/v1/chat/completions" → "http://host:4090/v1/models"
     const baseUrl = LLM_PROXY_URL
       .replace(/\/chat\/completions$/, '')
       .replace(/\/proxy$/, '')
