@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TreeNode, useSpaceStore } from '../../stores/spaceStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -53,12 +53,39 @@ function FileNode({ node, level }: FileNodeProps) {
   const { language } = useSettingsStore();
   const t = translations[language];
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // 권한 체크: Super Admin / Team Admin은 모든 파일, 일반 사용자는 본인 파일만
   const canDelete = user?.isSuperAdmin || user?.isTeamAdmin || node.createdBy === user?.loginid;
 
   const paddingLeft = 12 + level * 16 + 14; // Extra padding for alignment
   const isSelected = fileId === node.id;
+
+  const openMenu = (anchor: HTMLElement) => {
+    const rect = anchor.getBoundingClientRect();
+    // 메뉴를 버튼 아래에 열되, 화면 밖으로 나가면 왼쪽으로 조정
+    let left = rect.right + 4;
+    const menuWidth = 208; // w-52 = 13rem = 208px
+    if (left + menuWidth > window.innerWidth) {
+      left = rect.left - menuWidth - 4;
+    }
+    setMenuPos({ top: rect.top, left });
+    setShowMenu(true);
+  };
+
+  // 메뉴 밖 클릭 시 닫기
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showMenu]);
 
   const handleClick = () => {
     setSelectedFileId(node.id);
@@ -67,7 +94,21 @@ function FileNode({ node, level }: FileNodeProps) {
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setShowMenu(!showMenu);
+    openMenu(e.currentTarget as HTMLElement);
+  };
+
+  const handleDelete = async () => {
+    setShowMenu(false);
+    try {
+      await filesApi.moveToTrash(node.id);
+      if (isSelected) {
+        setSelectedFileId(null);
+        navigate('/');
+      }
+      refresh();
+    } catch {
+      alert(t.deleteFailed);
+    }
   };
 
   // Language availability badges
@@ -126,11 +167,30 @@ function FileNode({ node, level }: FileNodeProps) {
           </div>
         )}
 
+        {/* Trash button (hover) — visible directly without menu */}
+        {canDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
+            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all"
+            title={t.delete}
+          >
+            <TrashIcon className="w-3.5 h-3.5 text-red-400 hover:text-red-600" />
+          </button>
+        )}
+
         {/* Menu button */}
         <button
+          ref={menuBtnRef}
           onClick={(e) => {
             e.stopPropagation();
-            setShowMenu(!showMenu);
+            if (showMenu) {
+              setShowMenu(false);
+            } else {
+              openMenu(e.currentTarget);
+            }
           }}
           className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-tertiary transition-all"
         >
@@ -138,81 +198,67 @@ function FileNode({ node, level }: FileNodeProps) {
         </button>
       </div>
 
-      {/* Context menu */}
+      {/* Context menu — fixed position to escape overflow clipping */}
       {showMenu && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowMenu(false)}
-          />
-          <div className="absolute left-full top-0 ml-1 z-50 w-52 bg-surface-primary rounded-xl border border-border-primary shadow-soft overflow-hidden animate-fadeIn">
-            <div className="py-1">
+        <div
+          ref={menuRef}
+          className="fixed z-[9999] w-52 bg-surface-primary rounded-xl border border-border-primary shadow-lg overflow-hidden animate-fadeIn"
+          style={{ top: menuPos.top, left: menuPos.left }}
+        >
+          <div className="py-1">
+            <button
+              onClick={() => {
+                // TODO: Implement share
+                setShowMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-content-secondary hover:bg-surface-secondary transition-colors"
+            >
+              <ShareIcon className="w-4 h-4" />
+              {t.share}
+            </button>
+            <button
+              onClick={() => {
+                // TODO: Implement export
+                setShowMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-content-secondary hover:bg-surface-secondary transition-colors"
+            >
+              <ArrowDownTrayIcon className="w-4 h-4" />
+              {t.export}
+            </button>
+          </div>
+
+          {/* Language section */}
+          {availableLanguages.length > 0 && (
+            <div className="py-1 border-t border-border-primary">
+              <div className="px-4 py-1.5 text-xs font-medium text-content-quaternary uppercase tracking-wider">
+                {t.languages}
+              </div>
+              {availableLanguages.map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => setShowMenu(false)}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-content-secondary hover:bg-surface-secondary transition-colors"
+                >
+                  <LanguageIcon className="w-4 h-4" />
+                  {t[lang as 'KO' | 'EN' | 'CN']}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {canDelete && (
+            <div className="py-1 border-t border-border-primary">
               <button
-                onClick={() => {
-                  // TODO: Implement share
-                  setShowMenu(false);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-content-secondary hover:bg-surface-secondary transition-colors"
+                onClick={handleDelete}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
-                <ShareIcon className="w-4 h-4" />
-                {t.share}
-              </button>
-              <button
-                onClick={() => {
-                  // TODO: Implement export
-                  setShowMenu(false);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-content-secondary hover:bg-surface-secondary transition-colors"
-              >
-                <ArrowDownTrayIcon className="w-4 h-4" />
-                {t.export}
+                <TrashIcon className="w-4 h-4" />
+                {t.delete}
               </button>
             </div>
-
-            {/* Language section */}
-            {availableLanguages.length > 0 && (
-              <div className="py-1 border-t border-border-primary">
-                <div className="px-4 py-1.5 text-xs font-medium text-content-quaternary uppercase tracking-wider">
-                  {t.languages}
-                </div>
-                {availableLanguages.map((lang) => (
-                  <button
-                    key={lang}
-                    onClick={() => setShowMenu(false)}
-                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-content-secondary hover:bg-surface-secondary transition-colors"
-                  >
-                    <LanguageIcon className="w-4 h-4" />
-                    {t[lang as 'KO' | 'EN' | 'CN']}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {canDelete && (
-              <div className="py-1 border-t border-border-primary">
-                <button
-                  onClick={async () => {
-                    setShowMenu(false);
-                    try {
-                      await filesApi.moveToTrash(node.id);
-                      if (isSelected) {
-                        setSelectedFileId(null);
-                        navigate('/');
-                      }
-                      refresh();
-                    } catch {
-                      alert(t.deleteFailed);
-                    }
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                  {t.delete}
-                </button>
-              </div>
-            )}
-          </div>
-        </>
+          )}
+        </div>
       )}
     </div>
   );

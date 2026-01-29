@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { TreeNode, useSpaceStore } from '../../stores/spaceStore';
 import NoteTree from './NoteTree';
 import {
@@ -14,12 +14,37 @@ interface FolderNodeProps {
 }
 
 function FolderNode({ node, level }: FolderNodeProps) {
-  const { expandedFolders, toggleFolder } = useSpaceStore();
+  const { expandedFolders, toggleFolder, expandFolder, collapseFolder } = useSpaceStore();
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const isExpanded = expandedFolders.has(node.id);
   const hasChildren = node.children && node.children.length > 0;
   const paddingLeft = 12 + level * 16;
+
+  const openMenu = (anchor: HTMLElement) => {
+    const rect = anchor.getBoundingClientRect();
+    let left = rect.right + 4;
+    const menuWidth = 192; // w-48 = 12rem = 192px
+    if (left + menuWidth > window.innerWidth) {
+      left = rect.left - menuWidth - 4;
+    }
+    setMenuPos({ top: rect.top, left });
+    setShowMenu(true);
+  };
+
+  // 메뉴 밖 클릭 시 닫기
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showMenu]);
 
   const handleClick = () => {
     toggleFolder(node.id);
@@ -27,7 +52,37 @@ function FolderNode({ node, level }: FolderNodeProps) {
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setShowMenu(!showMenu);
+    openMenu(e.currentTarget as HTMLElement);
+  };
+
+  // 하위 폴더 ID 재귀 수집
+  const getAllChildFolderIds = (n: TreeNode): string[] => {
+    const ids: string[] = [];
+    if (n.children) {
+      for (const child of n.children) {
+        if (child.type === 'folder') {
+          ids.push(child.id);
+          ids.push(...getAllChildFolderIds(child));
+        }
+      }
+    }
+    return ids;
+  };
+
+  const handleExpandAll = () => {
+    setShowMenu(false);
+    expandFolder(node.id);
+    for (const id of getAllChildFolderIds(node)) {
+      expandFolder(id);
+    }
+  };
+
+  const handleCollapseAll = () => {
+    setShowMenu(false);
+    collapseFolder(node.id);
+    for (const id of getAllChildFolderIds(node)) {
+      collapseFolder(id);
+    }
   };
 
   return (
@@ -66,7 +121,11 @@ function FolderNode({ node, level }: FolderNodeProps) {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setShowMenu(!showMenu);
+            if (showMenu) {
+              setShowMenu(false);
+            } else {
+              openMenu(e.currentTarget);
+            }
           }}
           className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-tertiary transition-all"
         >
@@ -86,30 +145,28 @@ function FolderNode({ node, level }: FolderNodeProps) {
         </div>
       )}
 
-      {/* Context menu */}
+      {/* Context menu — fixed position to escape overflow clipping */}
       {showMenu && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowMenu(false)}
-          />
-          <div className="absolute left-full top-0 ml-1 z-50 w-48 bg-surface-primary rounded-xl border border-border-primary shadow-soft overflow-hidden animate-fadeIn">
-            <div className="py-1">
-              <button
-                onClick={() => setShowMenu(false)}
-                className="w-full px-4 py-2 text-sm text-left text-content-secondary hover:bg-surface-secondary transition-colors"
-              >
-                Open all
-              </button>
-              <button
-                onClick={() => setShowMenu(false)}
-                className="w-full px-4 py-2 text-sm text-left text-content-secondary hover:bg-surface-secondary transition-colors"
-              >
-                Collapse all
-              </button>
-            </div>
+        <div
+          ref={menuRef}
+          className="fixed z-[9999] w-48 bg-surface-primary rounded-xl border border-border-primary shadow-lg overflow-hidden animate-fadeIn"
+          style={{ top: menuPos.top, left: menuPos.left }}
+        >
+          <div className="py-1">
+            <button
+              onClick={handleExpandAll}
+              className="w-full px-4 py-2 text-sm text-left text-content-secondary hover:bg-surface-secondary transition-colors"
+            >
+              모두 펼치기
+            </button>
+            <button
+              onClick={handleCollapseAll}
+              className="w-full px-4 py-2 text-sm text-left text-content-secondary hover:bg-surface-secondary transition-colors"
+            >
+              모두 접기
+            </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
