@@ -11,6 +11,7 @@ import {
   QueueUpdate,
   RequestProgress,
   RequestComplete,
+  RequestAskUser,
 } from '../../services/websocket';
 import {
   XMarkIcon,
@@ -52,6 +53,10 @@ const translations = {
     createdFiles: '생성된 파일',
     createdFolders: '생성된 폴더',
     error: '오류가 발생했습니다',
+    aiQuestion: 'AI가 질문을 보냈습니다',
+    customInput: '직접 입력',
+    sendAnswer: '응답 보내기',
+    timeRemaining: '남은 시간',
   },
   en: {
     title: 'Create New Note',
@@ -72,6 +77,10 @@ const translations = {
     createdFiles: 'Created Files',
     createdFolders: 'Created Folders',
     error: 'An error occurred',
+    aiQuestion: 'AI has a question',
+    customInput: 'Custom input',
+    sendAnswer: 'Send answer',
+    timeRemaining: 'Time remaining',
   },
   cn: {
     title: '创建新笔记',
@@ -92,6 +101,10 @@ const translations = {
     createdFiles: '创建的文件',
     createdFolders: '创建的文件夹',
     error: '发生错误',
+    aiQuestion: 'AI 发来了一个问题',
+    customInput: '自定义输入',
+    sendAnswer: '发送回答',
+    timeRemaining: '剩余时间',
   },
 };
 
@@ -112,6 +125,11 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
   const [error, setError] = useState<string | null>(null);
   const [showRating, setShowRating] = useState(false);
   const [ratingModel, setRatingModel] = useState('');
+  const [askUserData, setAskUserData] = useState<RequestAskUser | null>(null);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [customAnswer, setCustomAnswer] = useState('');
+  const [askDeadline, setAskDeadline] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>('');
 
   useEffect(() => {
     if (isOpen && textareaRef.current) {
@@ -169,6 +187,16 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
       if (data.requestId !== requestId) return;
       setStatus('failed');
       setError(data.error || t.error);
+      setAskUserData(null);
+      setAskDeadline(null);
+    };
+
+    const handleAskUser = (data: RequestAskUser) => {
+      if (data.requestId !== requestId) return;
+      setAskUserData(data);
+      setAskDeadline(Date.now() + data.timeoutMs);
+      setSelectedOption(null);
+      setCustomAnswer('');
     };
 
     subscribeToRequest(requestId);
@@ -176,14 +204,53 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
     on('request:progress', handleProgress);
     on('request:complete', handleComplete);
     on('request:failed', handleFailed);
+    on('request:ask_user', handleAskUser);
 
     return () => {
       off('queue:update', handleQueueUpdate);
       off('request:progress', handleProgress);
       off('request:complete', handleComplete);
       off('request:failed', handleFailed);
+      off('request:ask_user', handleAskUser);
     };
   }, [requestId, refresh, t.error]);
+
+  // 카운트다운 타이머
+  useEffect(() => {
+    if (!askDeadline) {
+      setTimeLeft('');
+      return;
+    }
+
+    const tick = () => {
+      const remaining = Math.max(0, askDeadline - Date.now());
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      setTimeLeft(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [askDeadline]);
+
+  const handleSubmitAnswer = async () => {
+    if (!requestId || !askUserData) return;
+
+    const answer = selectedOption === '__custom__'
+      ? customAnswer.trim()
+      : selectedOption;
+
+    if (!answer) return;
+
+    try {
+      await requestsApi.answerQuestion(requestId, answer);
+      setAskUserData(null);
+      setAskDeadline(null);
+    } catch {
+      // 타임아웃 등으로 실패 시 failed 이벤트가 올 것임
+    }
+  };
 
   const handleSubmit = async () => {
     if (!input.trim() || !spaceId) return;
@@ -212,6 +279,10 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
     setProgressMessage('');
     setResult(null);
     setError(null);
+    setAskUserData(null);
+    setAskDeadline(null);
+    setSelectedOption(null);
+    setCustomAnswer('');
   };
 
   const handleClose = () => {
@@ -331,6 +402,84 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
                   {progressMessage}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* AI 질문 팝업 */}
+          {askUserData && (
+            <div className="w-full max-w-sm mt-4 p-5 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300 mb-3">
+                {t.aiQuestion}
+              </p>
+              <p className="text-base text-content-primary mb-4">
+                {askUserData.question}
+              </p>
+
+              <div className="space-y-2 mb-4">
+                {askUserData.options.map((option, i) => (
+                  <label
+                    key={i}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedOption === option
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
+                        : 'border-slate-200 dark:border-slate-600 hover:bg-surface-secondary'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="ask_option"
+                      checked={selectedOption === option}
+                      onChange={() => setSelectedOption(option)}
+                      className="accent-primary-500"
+                    />
+                    <span className="text-sm text-content-primary">{option}</span>
+                  </label>
+                ))}
+
+                {/* 직접 입력 */}
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    selectedOption === '__custom__'
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
+                      : 'border-slate-200 dark:border-slate-600 hover:bg-surface-secondary'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="ask_option"
+                    checked={selectedOption === '__custom__'}
+                    onChange={() => setSelectedOption('__custom__')}
+                    className="accent-primary-500"
+                  />
+                  <span className="text-sm text-content-primary">{t.customInput}</span>
+                </label>
+
+                {selectedOption === '__custom__' && (
+                  <input
+                    type="text"
+                    value={customAnswer}
+                    onChange={(e) => setCustomAnswer(e.target.value)}
+                    placeholder={t.customInput}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm text-content-primary placeholder:text-content-quaternary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSubmitAnswer();
+                    }}
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-content-tertiary">
+                  {t.timeRemaining}: {timeLeft}
+                </span>
+                <button
+                  onClick={handleSubmitAnswer}
+                  disabled={!selectedOption || (selectedOption === '__custom__' && !customAnswer.trim())}
+                  className="btn-primary text-sm"
+                >
+                  {t.sendAnswer}
+                </button>
+              </div>
             </div>
           )}
 

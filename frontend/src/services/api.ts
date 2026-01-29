@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '../stores/authStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -98,6 +99,9 @@ export const requestsApi = {
 
   getQueueStatus: (spaceId: string) =>
     api.get('/requests/queue-status', { params: { spaceId } }),
+
+  answerQuestion: (requestId: string, answer: string) =>
+    api.post(`/requests/${requestId}/answer`, { answer }),
 };
 
 // ==================== Comments API ====================
@@ -163,12 +167,28 @@ export const adminApi = {
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || 'http://a2g.samsungds.net:4090';
 
 export const ratingApi = {
-  submit: (modelName: string, rating: number) =>
-    axios.post(`${DASHBOARD_URL}/api/rating`, {
-      modelName,
-      rating,
-      serviceId: 'aipo-web',
-    }),
+  submit: (modelName: string, rating: number) => {
+    const user = useAuthStore.getState().user;
+
+    return axios.post(
+      `${DASHBOARD_URL}/api/rating`,
+      {
+        modelName,
+        rating,
+        serviceId: 'aipo-web',
+      },
+      {
+        headers: {
+          'X-Service-Id': 'aipo-web',
+          ...(user && {
+            'X-User-Id': user.loginid,
+            'X-User-Name': encodeURIComponent(user.username),
+            'X-User-Dept': encodeURIComponent(user.deptname),
+          }),
+        },
+      }
+    );
+  },
 };
 
 // ==================== Settings API ====================

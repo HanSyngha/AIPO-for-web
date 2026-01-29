@@ -9,6 +9,7 @@ import { prisma, io } from '../index.js';
 import { authenticateToken, AuthenticatedRequest, loadUserId, isSuperAdmin } from '../middleware/auth.js';
 import { inputRateLimiter, searchRateLimiter } from '../middleware/rateLimit.js';
 import { addToQueue, getQueuePosition, cancelRequest } from '../services/queue/bull.service.js';
+import { resolveUserAnswer } from '../services/llm/agent.service.js';
 
 export const requestsRoutes = Router();
 
@@ -364,6 +365,45 @@ requestsRoutes.get('/:id', async (req: AuthenticatedRequest, res) => {
   } catch (error) {
     console.error('Get request error:', error);
     res.status(500).json({ error: 'Failed to get request' });
+  }
+});
+
+/**
+ * POST /requests/:id/answer
+ * 사용자 질문 응답 (ask_to_user)
+ */
+requestsRoutes.post('/:id/answer', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { answer } = req.body;
+
+    if (!answer) {
+      res.status(400).json({ error: 'answer is required' });
+      return;
+    }
+
+    // 본인 요청인지 확인
+    const request = await prisma.request.findUnique({ where: { id } });
+    if (!request) {
+      res.status(404).json({ error: 'Request not found' });
+      return;
+    }
+
+    if (request.userId !== req.userId && !isSuperAdmin(req.user!.loginid)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const resolved = resolveUserAnswer(id, answer);
+    if (!resolved) {
+      res.status(404).json({ error: 'No pending question for this request' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Answer question error:', error);
+    res.status(500).json({ error: 'Failed to submit answer' });
   }
 });
 

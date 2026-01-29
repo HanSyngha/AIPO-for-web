@@ -32,11 +32,19 @@ export interface RequestComplete {
   error?: string;
 }
 
+export interface RequestAskUser {
+  requestId: string;
+  question: string;
+  options: string[];
+  timeoutMs: number;
+}
+
 type EventHandlers = {
   'queue:update': (data: QueueUpdate) => void;
   'request:progress': (data: RequestProgress) => void;
   'request:complete': (data: RequestComplete) => void;
   'request:failed': (data: { requestId: string; error: string }) => void;
+  'request:ask_user': (data: RequestAskUser) => void;
 };
 
 /**

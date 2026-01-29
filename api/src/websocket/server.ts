@@ -135,6 +135,24 @@ export function emitRequestComplete(
 }
 
 /**
+ * 사용자 질문 전송 (ask_to_user)
+ */
+export function emitAskUser(
+  io: SocketIOServer,
+  requestId: string,
+  data: {
+    question: string;
+    options: string[];
+    timeoutMs: number;
+  }
+): void {
+  io.to(`request:${requestId}`).emit('request:ask_user', {
+    requestId,
+    ...data,
+  });
+}
+
+/**
  * 요청 실패 알림
  */
 export function emitRequestFailed(

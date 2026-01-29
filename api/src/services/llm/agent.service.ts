@@ -10,8 +10,39 @@
 import { prisma, io, redis } from '../../index.js';
 import { executeTool, getToolDefinitions, ToolResult } from './tools.service.js';
 import { updateTokenUsage, getTokenWarning, TokenUsageStatus, createAgentSession } from './token.service.js';
-import { emitRequestProgress } from '../../websocket/server.js';
+import { emitRequestProgress, emitAskUser, emitRequestFailed } from '../../websocket/server.js';
 import { sendFailureEmail } from '../mail.service.js';
+
+// ===================== ask_to_user 대기 메커니즘 =====================
+interface UndoEntry {
+  tool: string;
+  params: Record<string, any>;
+}
+
+const pendingQuestions = new Map<string, {
+  resolve: (answer: string) => void;
+  reject: (error: Error) => void;
+}>();
+
+export function resolveUserAnswer(requestId: string, answer: string): boolean {
+  const pending = pendingQuestions.get(requestId);
+  if (pending) {
+    pending.resolve(answer);
+    pendingQuestions.delete(requestId);
+    return true;
+  }
+  return false;
+}
+
+async function revertChanges(spaceId: string, undoStack: UndoEntry[]): Promise<void> {
+  for (let i = undoStack.length - 1; i >= 0; i--) {
+    try {
+      await executeTool(spaceId, undoStack[i].tool, undoStack[i].params, 'system');
+    } catch (err) {
+      console.error(`[Agent] Revert failed for ${undoStack[i].tool}:`, err);
+    }
+  }
+}
 
 // LLM Proxy 설정
 const LLM_PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:3400/api/v1';
@@ -200,6 +231,13 @@ ${treeStructure || '(빈 공간)'}
 - edit_file_name(path, newName): 파일 이름 변경
 - move_file(fromPath, toPath): 파일 이동
 
+### 사용자 질문
+- ask_to_user(question, options): 사용자에게 질문합니다. 2~5개 객관식 선택지를 제공하세요.
+  - 입력 내용이 모호하여 정확한 분류/처리가 어려울 때 사용
+  - 선택지는 구체적이고 명확해야 합니다
+  - 사용자가 "직접 입력"으로 다른 답변을 할 수도 있습니다
+  - 질문은 최소한으로 하세요 (꼭 필요할 때만)
+
 ### 완료
 - complete(summary): 작업 완료 선언
 
@@ -267,6 +305,9 @@ ${treeStructure || '(빈 공간)'}
 - move_file(fromPath, toPath): 파일 이동
 - delete_file(path): 파일 삭제 (휴지통으로)
 - delete_folder(path): 빈 폴더 삭제
+- ask_to_user(question, options): 사용자에게 질문합니다. 2~5개 객관식 선택지를 제공하세요.
+  - 리팩토링 방향이 불확실하거나 사용자 확인이 필요할 때 사용
+  - 질문은 최소한으로 하세요 (꼭 필요할 때만)
 - complete(summary): 작업 완료
 
 ## 리팩토링 절차
@@ -379,6 +420,9 @@ export async function runAgentLoop(
     foldersCreated: [],
   };
 
+  // Undo 스택 (ask_to_user 타임아웃 시 revert 용)
+  const undoStack: UndoEntry[] = [];
+
   let iteration = 0;
 
   while (iteration < MAX_ITERATIONS) {
@@ -460,6 +504,68 @@ export async function runAgentLoop(
 
           console.log(`[Agent] Tool call: ${toolName}`, toolArgs);
 
+          // ask_to_user 처리: WebSocket으로 질문 전송 후 응답 대기
+          if (toolName === 'ask_to_user') {
+            emitAskUser(io, requestId, {
+              question: toolArgs.question,
+              options: toolArgs.options,
+              timeoutMs: 180_000,
+            });
+
+            let userAnswer: string;
+            try {
+              userAnswer = await new Promise<string>((resolve, reject) => {
+                pendingQuestions.set(requestId, { resolve, reject });
+                setTimeout(() => {
+                  if (pendingQuestions.has(requestId)) {
+                    pendingQuestions.delete(requestId);
+                    reject(new Error('ASK_USER_TIMEOUT'));
+                  }
+                }, 180_000);
+              });
+            } catch (err) {
+              if ((err as Error).message === 'ASK_USER_TIMEOUT') {
+                console.log(`[Agent] ask_to_user timeout for request ${requestId}, reverting ${undoStack.length} changes`);
+                await revertChanges(spaceId, undoStack);
+                await prisma.request.update({
+                  where: { id: requestId },
+                  data: { status: 'CANCELLED', error: 'User response timeout' },
+                });
+                await sendFailureEmail(
+                  request.user.loginid,
+                  request.user.username,
+                  '응답 시간 초과',
+                  'AI가 질문을 보냈으나 3분 내에 응답이 없어 작업이 취소되었습니다. 진행 중이던 모든 변경이 원복되었습니다.'
+                );
+                emitRequestFailed(io, requestId, request.user.loginid, '응답 시간 초과로 작업이 취소되었습니다.');
+                throw new Error('User response timeout - all changes reverted');
+              }
+              throw err;
+            }
+
+            // 응답을 tool result로 LLM에 전달
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              name: 'ask_to_user',
+              content: JSON.stringify({ success: true, message: `사용자 응답: ${userAnswer}` }),
+            });
+
+            await prisma.requestLog.create({
+              data: {
+                requestId,
+                iteration,
+                tool: toolName,
+                params: JSON.stringify(toolArgs),
+                result: JSON.stringify({ answer: userAnswer }),
+                success: true,
+                duration: 0,
+              },
+            });
+
+            continue;
+          }
+
           // complete() 호출 시 종료
           if (toolName === 'complete') {
             result.summary = toolArgs.summary;
@@ -487,14 +593,31 @@ export async function runAgentLoop(
           const toolResult = await executeTool(spaceId, toolName, toolArgs, request.user.loginid);
           const duration = Date.now() - startTime;
 
-          // 결과 추적
+          // 결과 추적 + Undo 스택
           if (toolResult.success) {
             if (toolName === 'add_file') {
               result.filesCreated.push(toolArgs.path);
+              undoStack.push({ tool: 'undo_add_file', params: { path: toolArgs.path } });
             } else if (toolName === 'edit_file') {
               result.filesModified.push(toolArgs.path);
+              undoStack.push({ tool: 'edit_file', params: { path: toolArgs.path, before: toolArgs.after, after: toolArgs.before } });
             } else if (toolName === 'add_folder') {
               result.foldersCreated.push(toolArgs.path);
+              undoStack.push({ tool: 'undo_add_folder', params: { path: toolArgs.path } });
+            } else if (toolName === 'move_file') {
+              undoStack.push({ tool: 'move_file', params: { fromPath: toolArgs.toPath, toPath: toolArgs.fromPath } });
+            } else if (toolName === 'edit_file_name') {
+              const oldName = toolArgs.path.split('/').pop() || '';
+              const parentPath = toolArgs.path.substring(0, toolArgs.path.lastIndexOf('/'));
+              const newPath = parentPath + '/' + toolArgs.newName;
+              undoStack.push({ tool: 'edit_file_name', params: { path: newPath, newName: oldName } });
+            } else if (toolName === 'edit_folder_name') {
+              const oldName = toolArgs.path.split('/').pop() || '';
+              const parentPath = toolArgs.path.substring(0, toolArgs.path.lastIndexOf('/'));
+              const newPath = parentPath + '/' + toolArgs.newName;
+              undoStack.push({ tool: 'edit_folder_name', params: { path: newPath, newName: oldName } });
+            } else if (toolName === 'delete_file' && toolResult.data?.fileId) {
+              undoStack.push({ tool: 'restore_file', params: { fileId: toolResult.data.fileId } });
             }
           }
 
