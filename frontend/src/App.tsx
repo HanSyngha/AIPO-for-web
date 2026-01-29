@@ -22,7 +22,7 @@ function App() {
   const checkAuth = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('aipo_token');
+      const token = localStorage.getItem('once_token');
       if (!token) {
         setReady(true);
         setIsLoading(false);
@@ -32,7 +32,7 @@ function App() {
       const response = await authApi.me();
       setUser(response.data);
     } catch {
-      localStorage.removeItem('aipo_token');
+      localStorage.removeItem('once_token');
     } finally {
       setReady(true);
       setIsLoading(false);
@@ -55,7 +55,7 @@ function App() {
 
           {/* Loading text */}
           <h1 className="text-xl font-semibold text-content-primary dark:text-content-primary-dark mb-2">
-            AIPO for Web
+            ONCE
           </h1>
           <p className="text-sm text-content-secondary dark:text-content-secondary-dark">
             로딩 중...

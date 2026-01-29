@@ -55,7 +55,7 @@ export function initializeWebSocket(): Socket {
     return socket;
   }
 
-  const token = localStorage.getItem('aipo_token');
+  const token = localStorage.getItem('once_token');
 
   socket = io(WS_URL, {
     path: '/ws',

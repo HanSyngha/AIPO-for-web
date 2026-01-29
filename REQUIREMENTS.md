@@ -1,8 +1,8 @@
-# AIPO for Web - 요구사항 명세서
+# ONCE - 요구사항 명세서
 
 > **버전**: 1.2.0
 > **작성일**: 2026-01-28
-> **서비스명**: AIPO for Web
+> **서비스명**: ONCE
 > **호스팅**: a2g.samsungds.net
 > **상태**: 최종 검토 완료
 > **관련 코드베이스**: ~/Dashboard (이 문서가 위치한 monorepo)
@@ -42,18 +42,18 @@
 | 링크 공유 | SSO 로그인 필수 공유 링크 |
 
 ### 1.4 브랜딩
-- **서비스명**: AIPO for Web
+- **서비스명**: ONCE
 - **기존 AIPO**: "AIPO for Desktop"으로 명칭 변경
-- **문서 위치**: Dashboard docs-site에 "AIPO for Web" 가이드 추가
+- **문서 위치**: Dashboard docs-site에 "ONCE" 가이드 추가
   - 서비스 목적 ("작성하기 귀찮을 때 쓰는 지식 공유 서비스") 명시
   - 사용 시나리오 예시 포함
   - **⚠️ 사용자 직접 편집 불가** 안내 필수
 
 ### 1.5 관련 코드베이스
 - **Dashboard**: `~/Dashboard` (본 monorepo)
-  - AIPO for Web는 `~/Dashboard/packages/aipo-web`에 위치
+  - ONCE는 `~/Dashboard/packages/once`에 위치
   - Dashboard API 연동 필요 (사용량 추적, LLM Proxy)
-  - **수정 범위**: docs-site에 AIPO for Web 가이드만 추가 (다른 Dashboard 코드는 수정하지 않음)
+  - **수정 범위**: docs-site에 ONCE 가이드만 추가 (다른 Dashboard 코드는 수정하지 않음)
 
 ---
 
@@ -120,14 +120,14 @@ ENV NO_PROXY=localhost,127.0.0.1,genai.samsungds.net
 ```env
 # 필수
 NODE_ENV=production
-DATABASE_URL=postgresql://user:pass@localhost:16003/aipo_notes
+DATABASE_URL=postgresql://user:pass@localhost:16003/once_notes
 REDIS_URL=redis://localhost:16004
 JWT_SECRET=your-secret-key
 DEVELOPERS=syngha.han
 
 # LLM 연동
 LLM_PROXY_URL=http://dashboard-api:3400/api/llm
-LLM_SERVICE_ID=aipo-notes
+LLM_SERVICE_ID=once-notes
 
 # Knox Mail
 KNOX_MAIL_URL=http://genai.samsungds.net:20080/knox/mail/send
@@ -628,7 +628,7 @@ function getMaxTokens(modelName: string): number {
 ### 7.7 LLM 모델
 - Dashboard 기본 모델 사용
 - Dashboard LLM Proxy를 통해 호출
-- serviceId: `aipo-notes`
+- serviceId: `once-notes`
 
 ### 7.8 Fallback 정책
 ```
@@ -975,7 +975,7 @@ interface SearchResult {
 ### 14.1 전체 레이아웃
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Header: AIPO for Web 로고 | 검색바 | [KR▼] | 🌙 | 👤 프로필      │
+│  Header: ONCE 로고 | 검색바 | [KR▼] | 🌙 | 👤 프로필      │
 ├────────────┬────────────────────────────────────────────────────┤
 │            │                                                    │
 │  Sidebar   │                    Main Content                   │
@@ -1001,7 +1001,7 @@ interface SearchResult {
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│                        🗒️ AIPO for Web                            │
+│                        🗒️ ONCE                            │
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │ 🔍 무엇이든 검색하세요...                                   │  │
@@ -1021,7 +1021,7 @@ interface SearchResult {
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│                     🎉 AIPO for Web에 오신 것을 환영합니다!         │
+│                     🎉 ONCE에 오신 것을 환영합니다!         │
 │                                                                 │
 │    ┌─────────────────────────────────────────────────────┐      │
 │    │  💡 첫 노트를 만들어보세요                            │      │
@@ -1173,7 +1173,7 @@ interface ShareLink {
 ### 15.4 도움말
 - 서비스 내 도움말 페이지
 - 온보딩 가이드 (첫 로그인 시 표시)
-- Dashboard docs-site에 "AIPO for Web" 가이드 추가
+- Dashboard docs-site에 "ONCE" 가이드 추가
 - 기존 AIPO 문서는 "AIPO for Desktop"으로 변경
 
 ### 15.5 문의 및 피드백
@@ -1200,9 +1200,9 @@ interface ShareLink {
 ```
 
 **주의사항**:
-- AIPO for Web 자체 피드백 시스템 구축하지 않음
+- ONCE 자체 피드백 시스템 구축하지 않음
 - Dashboard의 기존 Feedback 시스템 활용
-- 피드백 작성 시 서비스 선택에서 "AIPO for Web" 선택하도록 안내
+- 피드백 작성 시 서비스 선택에서 "ONCE" 선택하도록 안내
 
 ---
 
@@ -1265,7 +1265,7 @@ Content-Type: application/json
 <body>
   <div class="container">
     <div class="header">
-      <h1>AIPO for Web 알림</h1>
+      <h1>ONCE 알림</h1>
     </div>
     <div class="content">
       <h2>요청 처리 실패</h2>
@@ -1289,8 +1289,8 @@ Content-Type: application/json
 ## 18. 모니터링 / 로깅
 
 ### 18.1 Dashboard 통합
-- 기존 Dashboard에서 AIPO for Web 사용량 통계 확인
-- serviceId: `aipo-notes`
+- 기존 Dashboard에서 ONCE 사용량 통계 확인
+- serviceId: `once-notes`
 - Dashboard 사용량 수집 방식과 동일
 
 ### 18.2 수집 데이터
@@ -1335,13 +1335,13 @@ Response:
 │  1. 일일 전체 백업 (Daily Full Backup)                           │
 │     - 시간: 매일 새벽 3시 (KST)                                  │
 │     - 방식: pg_dump --format=custom                             │
-│     - 저장: /backups/daily/aipo_notes_YYYYMMDD.dump             │
+│     - 저장: /backups/daily/once_notes_YYYYMMDD.dump             │
 │     - 보관: 30일                                                │
 │                                                                 │
 │  2. 주간 압축 백업 (Weekly Compressed)                           │
 │     - 시간: 매주 일요일 새벽 4시                                  │
 │     - 방식: 일일 백업 파일 압축 (gzip)                           │
-│     - 저장: /backups/weekly/aipo_notes_YYYYWW.dump.gz           │
+│     - 저장: /backups/weekly/once_notes_YYYYWW.dump.gz           │
 │     - 보관: 12주 (3개월)                                        │
 │                                                                 │
 │  3. Redis 백업                                                   │
@@ -1350,7 +1350,7 @@ Response:
 │     - 저장: /backups/redis/                                     │
 │                                                                 │
 │  4. 복구 절차                                                    │
-│     - pg_restore -d aipo_notes /backups/daily/xxx.dump          │
+│     - pg_restore -d once_notes /backups/daily/xxx.dump          │
 │     - 예상 RTO: 30분 이내                                        │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -1365,8 +1365,8 @@ DATE=$(date +%Y%m%d)
 BACKUP_DIR=/backups/daily
 
 # PostgreSQL 백업
-pg_dump -h localhost -p 16003 -U postgres -Fc aipo_notes \
-  > $BACKUP_DIR/aipo_notes_$DATE.dump
+pg_dump -h localhost -p 16003 -U postgres -Fc once_notes \
+  > $BACKUP_DIR/once_notes_$DATE.dump
 
 # 30일 이상 된 백업 삭제
 find $BACKUP_DIR -name "*.dump" -mtime +30 -delete
@@ -1854,7 +1854,7 @@ const headers = {
   'X-User-Dept': encodeURIComponent(user.deptname),  // 예: 'AI%ED%94%8C%EB%9E%AB%ED%8F%BC%ED%8C%80(DS%EB%B6%80%EB%AC%B8)'
 
   // ⚠️ 필수: 서비스 식별용 헤더
-  'X-Service-Id': 'aipo-notes',        // Dashboard에 등록된 서비스 ID
+  'X-Service-Id': 'once-notes',        // Dashboard에 등록된 서비스 ID
 };
 
 // 예시: LLM 호출
@@ -1875,7 +1875,7 @@ const response = await fetch(`${LLM_PROXY_URL}/v1/chat/completions`, {
 | `X-User-Id` | ✅ | 사용자 loginid | `syngha.han` |
 | `X-User-Name` | ✅ | 사용자 이름 (URL 인코딩) | `%ED%95%9C%EC%8A%B9%ED%95%98` |
 | `X-User-Dept` | ✅ | 부서명 (URL 인코딩) | `AI%ED%94%8C%EB%9E%AB%ED%8F%BC%ED%8C%80(DS%EB%B6%80%EB%AC%B8)` |
-| `X-Service-Id` | ✅ | 서비스 식별자 | `aipo-notes` |
+| `X-Service-Id` | ✅ | 서비스 식별자 | `once-notes` |
 
 ### A.4 사용량 수집 (Dashboard가 자동 처리)
 ```
@@ -1889,10 +1889,10 @@ Dashboard LLM Proxy가 자동으로 처리하는 항목:
 
 ### A.5 Dashboard 서비스 사전 등록
 ```
-AIPO for Web 서비스를 Dashboard에 미리 등록해야 함:
+ONCE 서비스를 Dashboard에 미리 등록해야 함:
 1. Dashboard 관리 페이지에서 서비스 등록
-2. 서비스 ID: aipo-notes
-3. 서비스명: AIPO for Web
+2. 서비스 ID: once-notes
+3. 서비스명: ONCE
 4. 모델 할당 (사용할 LLM 모델 연결)
 ```
 
@@ -1914,7 +1914,7 @@ NODE_ENV=production
 PORT=16002
 
 # Database
-DATABASE_URL=postgresql://postgres:password@localhost:16003/aipo_notes
+DATABASE_URL=postgresql://postgres:password@localhost:16003/once_notes
 
 # Redis
 REDIS_URL=redis://localhost:16004
@@ -1926,7 +1926,7 @@ DEVELOPERS=syngha.han
 # ==================== 외부 서비스 ====================
 # Dashboard LLM Proxy
 LLM_PROXY_URL=http://dashboard-api:3400/api/llm
-LLM_SERVICE_ID=aipo-notes
+LLM_SERVICE_ID=once-notes
 
 # Knox Mail
 KNOX_MAIL_URL=http://genai.samsungds.net:20080/knox/mail/send
@@ -1959,7 +1959,7 @@ HISTORY_RETENTION_DAYS=30
 version: '3.8'
 
 services:
-  aipo-web:
+  once:
     build:
       context: .
       dockerfile: Dockerfile
@@ -1968,9 +1968,9 @@ services:
     environment:
       - VITE_API_URL=http://localhost:16002
     depends_on:
-      - aipo-api
+      - once-api
 
-  aipo-api:
+  once-api:
     build:
       context: ./api
       dockerfile: Dockerfile
@@ -1978,37 +1978,37 @@ services:
       - "16002:16002"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:password@aipo-db:5432/aipo_notes
-      - REDIS_URL=redis://aipo-redis:6379
+      - DATABASE_URL=postgresql://postgres:password@once-db:5432/once_notes
+      - REDIS_URL=redis://once-redis:6379
       - JWT_SECRET=${JWT_SECRET}
       - DEVELOPERS=syngha.han
       - LLM_PROXY_URL=${LLM_PROXY_URL}
       - KNOX_MAIL_URL=http://genai.samsungds.net:20080/knox/mail/send
     depends_on:
-      - aipo-db
-      - aipo-redis
+      - once-db
+      - once-redis
 
-  aipo-db:
+  once-db:
     image: postgres:15
     ports:
       - "16003:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=aipo_notes
+      - POSTGRES_DB=once_notes
     volumes:
-      - aipo-db-data:/var/lib/postgresql/data
+      - once-db-data:/var/lib/postgresql/data
 
-  aipo-redis:
+  once-redis:
     image: redis:7
     ports:
       - "16004:6379"
     volumes:
-      - aipo-redis-data:/data
+      - once-redis-data:/data
 
 volumes:
-  aipo-db-data:
-  aipo-redis-data:
+  once-db-data:
+  once-redis-data:
 ```
 
 ---
@@ -2037,7 +2037,7 @@ volumes:
 
 수정 범위 확인:
 - Dashboard 코드 수정: ❌ (금지)
-- Dashboard docs-site: ✅ (AIPO for Web 가이드만 추가)
+- Dashboard docs-site: ✅ (ONCE 가이드만 추가)
 ```
 
 ### D.3 잠재적 이슈 및 해결 방안
@@ -2053,7 +2053,7 @@ volumes:
 
 ### D.5 docs-site 가이드 작성 체크리스트
 ```
-Dashboard docs-site에 추가할 AIPO for Web 가이드:
+Dashboard docs-site에 추가할 ONCE 가이드:
 □ 서비스 소개
   □ "작성하기 귀찮을 때 쓰는 지식 공유 서비스"
   □ 사용 시나리오 (회의록, 아이디어, 지식 공유)

@@ -100,7 +100,7 @@ export default function Search() {
 
   useEffect(() => {
     // Load recent searches from localStorage
-    const stored = localStorage.getItem('aipo_recent_searches');
+    const stored = localStorage.getItem('once_recent_searches');
     if (stored) {
       try {
         setRecentSearches(JSON.parse(stored));
@@ -121,12 +121,12 @@ export default function Search() {
   const saveRecentSearch = (q: string) => {
     const updated = [q, ...recentSearches.filter((s) => s !== q)].slice(0, 5);
     setRecentSearches(updated);
-    localStorage.setItem('aipo_recent_searches', JSON.stringify(updated));
+    localStorage.setItem('once_recent_searches', JSON.stringify(updated));
   };
 
   const clearRecentSearches = () => {
     setRecentSearches([]);
-    localStorage.removeItem('aipo_recent_searches');
+    localStorage.removeItem('once_recent_searches');
   };
 
   const handleSearch = async (searchQuery?: string) => {

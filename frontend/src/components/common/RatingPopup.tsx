@@ -42,7 +42,7 @@ interface RatingPopupProps {
 }
 
 const RATING_INTERVAL = 2;
-const STORAGE_KEY = 'aipo_request_count';
+const STORAGE_KEY = 'once_request_count';
 
 /** 요청 횟수 추적. 2회마다 true 반환 */
 export function shouldShowRating(): boolean {

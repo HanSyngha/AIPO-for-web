@@ -554,9 +554,9 @@ adminRoutes.get('/users', requireSuperAdmin, async (req: AuthenticatedRequest, r
 
 // ==================== Model Management ====================
 
-const MODEL_CONFIG_KEY = 'aipo:model_config';
+const MODEL_CONFIG_KEY = 'once:model_config';
 const LLM_PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:3400/api/v1';
-const LLM_SERVICE_ID = process.env.LLM_SERVICE_ID || 'aipo-web';
+const LLM_SERVICE_ID = process.env.LLM_SERVICE_ID || 'once';
 
 /**
  * GET /admin/models

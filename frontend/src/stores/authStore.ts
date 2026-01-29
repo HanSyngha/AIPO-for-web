@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   clearUser: () => {
-    localStorage.removeItem('aipo_token');
+    localStorage.removeItem('once_token');
     set({ user: null });
   },
 

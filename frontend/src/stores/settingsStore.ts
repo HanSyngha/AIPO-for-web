@@ -57,7 +57,7 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
     }),
     {
-      name: 'aipo-settings',
+      name: 'once-settings',
       partialize: (state) => ({
         language: state.language,
         theme: state.theme,
@@ -70,7 +70,7 @@ export const useSettingsStore = create<SettingsState>()(
 
 // Apply theme on load
 if (typeof window !== 'undefined') {
-  const stored = localStorage.getItem('aipo-settings');
+  const stored = localStorage.getItem('once-settings');
   if (stored) {
     try {
       const { state } = JSON.parse(stored);

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# AIPO for Web - Database Backup Script
+# ONCE - Database Backup Script
 # Usage: ./backup.sh [backup_dir]
 #
 # This script creates a backup of the PostgreSQL database
@@ -8,15 +8,15 @@
 #
 # Recommended: Run via cron job
 # Example crontab entry (daily at 2 AM):
-# 0 2 * * * /path/to/aipo-web/scripts/backup.sh /backups >> /var/log/aipo-backup.log 2>&1
+# 0 2 * * * /path/to/once/scripts/backup.sh /backups >> /var/log/once-backup.log 2>&1
 
 set -e
 
 # Configuration
 BACKUP_DIR="${1:-/backups}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-DB_NAME="${POSTGRES_DB:-aipo_web}"
-DB_USER="${POSTGRES_USER:-aipo}"
+DB_NAME="${POSTGRES_DB:-once_web}"
+DB_USER="${POSTGRES_USER:-once}"
 DB_HOST="${POSTGRES_HOST:-localhost}"
 DB_PORT="${POSTGRES_PORT:-16003}"
 RETENTION_DAYS=30
@@ -42,10 +42,10 @@ log_error() {
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
 
-log_info "Starting AIPO for Web database backup..."
+log_info "Starting ONCE database backup..."
 
 # Backup filename
-BACKUP_FILE="$BACKUP_DIR/aipo_web_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="$BACKUP_DIR/once_web_${TIMESTAMP}.sql.gz"
 
 # Create backup using pg_dump
 log_info "Creating backup: $BACKUP_FILE"
@@ -77,7 +77,7 @@ fi
 
 # Clean up old backups
 log_info "Cleaning up backups older than $RETENTION_DAYS days..."
-OLD_BACKUPS=$(find "$BACKUP_DIR" -name "aipo_web_*.sql.gz" -type f -mtime +$RETENTION_DAYS)
+OLD_BACKUPS=$(find "$BACKUP_DIR" -name "once_web_*.sql.gz" -type f -mtime +$RETENTION_DAYS)
 
 if [ -n "$OLD_BACKUPS" ]; then
     echo "$OLD_BACKUPS" | while read -r file; do
@@ -90,7 +90,7 @@ fi
 
 # List current backups
 log_info "Current backups in $BACKUP_DIR:"
-ls -lh "$BACKUP_DIR"/aipo_web_*.sql.gz 2>/dev/null || log_warn "No backups found."
+ls -lh "$BACKUP_DIR"/once_web_*.sql.gz 2>/dev/null || log_warn "No backups found."
 
 # Calculate total backup size
 TOTAL_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
@@ -103,7 +103,7 @@ log_info "Backup process completed."
 #     -H "Content-Type: application/json" \
 #     -d "{
 #         \"to\": \"$ADMIN_EMAIL\",
-#         \"subject\": \"[AIPO for Web] Daily Backup Completed\",
+#         \"subject\": \"[ONCE] Daily Backup Completed\",
 #         \"body\": \"Backup completed at $(date). Size: $BACKUP_SIZE\"
 #     }"
 

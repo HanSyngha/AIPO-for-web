@@ -5,7 +5,7 @@
  */
 
 const KNOX_MAIL_URL = process.env.KNOX_MAIL_URL || 'http://genai.samsungds.net:20080/knox/mail/send';
-const SERVICE_NAME = 'AIPO for Web';
+const SERVICE_NAME = 'ONCE';
 const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:16001';
 
 interface MailContent {

@@ -1,5 +1,5 @@
 /**
- * AIPO for Web - API Server
+ * ONCE - API Server
  *
  * LLM 기반 자동 노트 정리 서비스 백엔드
  */
@@ -178,7 +178,7 @@ const PORT = parseInt(process.env.PORT || '16002', 10);
 httpServer.listen(PORT, () => {
   console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║                   AIPO for Web API Server                    ║
+║                      ONCE API Server                         ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Port:      ${PORT.toString().padEnd(47)}║
 ║  Env:       ${(process.env.NODE_ENV || 'development').padEnd(47)}║

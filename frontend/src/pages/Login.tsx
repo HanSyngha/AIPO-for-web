@@ -15,7 +15,7 @@ import {
 
 const translations = {
   ko: {
-    title: 'AIPO',
+    title: 'ONCE',
     subtitle: '작성하기 귀찮을 때 쓰는 지식 공유 서비스',
     description:
       '아무거나 입력하면 AI가 자동으로 정리해드립니다. 회의록, 아이디어, 메모, 뭐든지 괜찮아요.',
@@ -27,10 +27,10 @@ const translations = {
     feature2Desc: '한국어, 영어, 중국어 자동 번역',
     feature3: '팀 협업',
     feature3Desc: '팀 공간에서 함께 공유',
-    copyright: '© 2026 AIPO for Web. Developed by syngha.han',
+    copyright: '© 2026 ONCE. Developed by syngha.han',
   },
   en: {
-    title: 'AIPO',
+    title: 'ONCE',
     subtitle: 'Knowledge sharing for the lazy writer',
     description:
       'Just type anything and AI will organize it for you. Meeting notes, ideas, memos - anything works.',
@@ -42,10 +42,10 @@ const translations = {
     feature2Desc: 'Korean, English, Chinese translation',
     feature3: 'Team Collaboration',
     feature3Desc: 'Share in team spaces',
-    copyright: '© 2026 AIPO for Web. Developed by syngha.han',
+    copyright: '© 2026 ONCE. Developed by syngha.han',
   },
   cn: {
-    title: 'AIPO',
+    title: 'ONCE',
     subtitle: '懒人专用知识共享服务',
     description:
       '随意输入，AI 自动整理。会议记录、创意、备忘录，什么都可以。',
@@ -57,7 +57,7 @@ const translations = {
     feature2Desc: '韩语、英语、中文自动翻译',
     feature3: '团队协作',
     feature3Desc: '在团队空间中共享',
-    copyright: '© 2024 AIPO. 保留所有权利。',
+    copyright: '© 2026 ONCE. Developed by syngha.han',
   },
 };
 
@@ -79,7 +79,7 @@ export default function Login() {
 
   // Check if already logged in
   useEffect(() => {
-    const token = localStorage.getItem('aipo_token');
+    const token = localStorage.getItem('once_token');
     if (token && user) {
       navigate('/home');
     }
@@ -96,7 +96,7 @@ export default function Login() {
   }, [searchParams]);
 
   const checkExistingSession = async () => {
-    const token = localStorage.getItem('aipo_token');
+    const token = localStorage.getItem('once_token');
     if (!token) {
       setIsLoading(false);
       return;
@@ -107,7 +107,7 @@ export default function Login() {
       setUser(response.data);
       navigate('/home');
     } catch {
-      localStorage.removeItem('aipo_token');
+      localStorage.removeItem('once_token');
       setIsLoading(false);
     }
   };
@@ -133,7 +133,7 @@ export default function Login() {
       const response = await authApi.login(`sso.${ssoToken}`);
       const { user, sessionToken } = response.data;
 
-      localStorage.setItem('aipo_token', sessionToken);
+      localStorage.setItem('once_token', sessionToken);
       setUser(user);
 
       // Clear URL params

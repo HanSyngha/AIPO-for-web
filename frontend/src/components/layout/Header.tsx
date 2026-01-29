@@ -153,7 +153,7 @@ export default function Header() {
               <SparklesIcon className="w-5 h-5 text-white" />
             </div>
             <span className="text-lg font-semibold text-content-primary hidden sm:block">
-              AIPO
+              ONCE
             </span>
           </div>
         </div>

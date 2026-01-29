@@ -1,7 +1,7 @@
 {
-  "name": "@aipo-web/api",
+  "name": "@once/api",
   "version": "1.0.0",
-  "description": "AIPO for Web API Server",
+  "description": "ONCE API Server",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

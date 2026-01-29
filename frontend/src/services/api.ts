@@ -12,7 +12,7 @@ export const api = axios.create({
 
 // Request interceptor - add auth token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('aipo_token');
+  const token = localStorage.getItem('once_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -24,7 +24,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 || error.response?.status === 403) {
-      localStorage.removeItem('aipo_token');
+      localStorage.removeItem('once_token');
       window.location.href = '/';
     }
     return Promise.reject(error);
@@ -175,11 +175,11 @@ export const ratingApi = {
       {
         modelName,
         rating,
-        serviceId: 'aipo-web',
+        serviceId: 'once',
       },
       {
         headers: {
-          'X-Service-Id': 'aipo-web',
+          'X-Service-Id': 'once',
           ...(user && {
             'X-User-Id': user.loginid,
             'X-User-Name': encodeURIComponent(user.username),

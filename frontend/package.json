@@ -1,7 +1,7 @@
 {
-  "name": "@aipo-web/frontend",
+  "name": "@once/frontend",
   "version": "1.0.0",
-  "description": "AIPO for Web Frontend",
+  "description": "ONCE Frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",

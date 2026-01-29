@@ -29,7 +29,7 @@ export function getToolDefinitions() {
           properties: {
             path: {
               type: 'string',
-              description: '폴더 경로 (예: /projects/aipo)',
+              description: '폴더 경로 (예: /projects/once)',
             },
           },
           required: ['path'],

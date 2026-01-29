@@ -12,10 +12,10 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'AIPO for Web API',
+      title: 'ONCE API',
       version: '1.0.0',
       description: `
-# AIPO for Web API 문서
+# ONCE API 문서
 
 **"작성하기 귀찮을 때 쓰는 지식 공유 서비스"**
 
@@ -240,7 +240,7 @@ export function setupSwagger(app: Express): void {
         .swagger-ui .topbar { display: none }
         .swagger-ui .info .title { color: #667eea }
       `,
-      customSiteTitle: 'AIPO for Web API Docs',
+      customSiteTitle: 'ONCE API Docs',
       customfavIcon: '/favicon.ico',
     })
   );

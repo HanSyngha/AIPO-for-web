@@ -10,7 +10,7 @@ import { processInputRequest, processSearchRequest, processRefactorRequest } fro
 import { emitQueueUpdate, emitRequestComplete, emitRequestFailed } from '../../websocket/server.js';
 
 // 큐 설정
-const QUEUE_NAME = 'aipo-requests';
+const QUEUE_NAME = 'once-requests';
 const MAX_CONCURRENT_JOBS = 20;
 
 // BullMQ 연결 설정 (REDIS_URL 파싱)

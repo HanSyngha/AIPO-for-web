@@ -46,8 +46,8 @@ async function revertChanges(spaceId: string, undoStack: UndoEntry[]): Promise<v
 
 // LLM Proxy 설정
 const LLM_PROXY_URL = process.env.LLM_PROXY_URL || 'http://localhost:3400/api/v1';
-const LLM_SERVICE_ID = process.env.LLM_SERVICE_ID || 'aipo-web';
-const MODEL_CONFIG_KEY = 'aipo:model_config';
+const LLM_SERVICE_ID = process.env.LLM_SERVICE_ID || 'once';
+const MODEL_CONFIG_KEY = 'once:model_config';
 
 interface ModelConfig {
   defaultModel: string;
@@ -179,7 +179,7 @@ interface AgentResult {
  * 시스템 프롬프트 생성
  */
 function getSystemPrompt(type: 'INPUT' | 'SEARCH' | 'REFACTOR', treeStructure: string): string {
-  const basePrompt = `당신은 AIPO for Web의 AI 어시스턴트입니다.
+  const basePrompt = `당신은 ONCE의 AI 어시스턴트입니다.
 사용자의 입력을 분석하여 노트를 자동으로 정리하고 저장합니다.
 
 ## 루트 폴더 구조 (최상위만 표시)
@@ -194,7 +194,7 @@ ${treeStructure || '(빈 공간)'}
 폴더는 카테고리(분류) 역할, 파일은 실제 콘텐츠입니다.
 
 예시:
-  /프로젝트/AIPO/회의록/2024-01-15-킥오프.md
+  /프로젝트/ONCE/회의록/2024-01-15-킥오프.md
   /학습/머신러닝/강화학습/DQN-정리.md
   /업무일지/2024/1월/15일.md
 
@@ -219,7 +219,7 @@ ${treeStructure || '(빈 공간)'}
 - list_folder(path): 해당 폴더의 직계 자식(폴더+파일)만 조회. "/" = 루트.
 
 ### 폴더 관련
-- add_folder(path): 새 폴더 생성 (예: /프로젝트/AIPO)
+- add_folder(path): 새 폴더 생성 (예: /프로젝트/ONCE)
 - undo_add_folder(path): 폴더 생성 취소
 - edit_folder_name(path, newName): 폴더 이름 변경
 
