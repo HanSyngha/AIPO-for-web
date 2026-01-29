@@ -47,14 +47,19 @@ function FolderNode({ node, level }: FolderNodeProps) {
 
         {/* Folder icon */}
         {isExpanded ? (
-          <FolderOpenIcon className="w-4.5 h-4.5 text-amber-500 flex-shrink-0" />
+          <FolderOpenIcon className="w-[18px] h-[18px] text-amber-500 flex-shrink-0" />
         ) : (
-          <FolderIcon className="w-4.5 h-4.5 text-amber-500 flex-shrink-0" />
+          <FolderIcon className="w-[18px] h-[18px] text-amber-500 flex-shrink-0" />
         )}
 
-        {/* Folder name */}
+        {/* Folder name + child count */}
         <span className="flex-1 text-sm text-content-primary truncate ml-1.5">
           {node.name}
+          {hasChildren && (
+            <span className="ml-1 text-xs text-content-quaternary">
+              ({node.children!.length})
+            </span>
+          )}
         </span>
 
         {/* Menu button */}
@@ -71,7 +76,12 @@ function FolderNode({ node, level }: FolderNodeProps) {
 
       {/* Children */}
       {isExpanded && hasChildren && (
-        <div className="animate-slideDown">
+        <div className="relative animate-slideDown">
+          {/* Indent guide line */}
+          <div
+            className="absolute top-0 bottom-2 border-l border-border-secondary"
+            style={{ left: `${paddingLeft + 7}px` }}
+          />
           <NoteTree nodes={node.children!} level={level + 1} />
         </div>
       )}

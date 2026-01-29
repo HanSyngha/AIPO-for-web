@@ -426,6 +426,82 @@ filesRoutes.post('/:id/retry-translation/:lang', async (req: AuthenticatedReques
 });
 
 /**
+ * POST /files/:id/trash
+ * 파일을 휴지통으로 이동 (soft delete)
+ * 권한: Super Admin / Team Admin / 파일 본인 소유
+ */
+filesRoutes.post('/:id/trash', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const loginid = req.user!.loginid;
+
+    // 기본 접근 권한 확인 (공간 멤버십)
+    const canAccess = await canAccessFile(req.userId!, loginid, id);
+    if (!canAccess) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const file = await prisma.file.findUnique({
+      where: { id },
+      include: {
+        space: {
+          include: {
+            team: {
+              include: {
+                admins: { select: { userId: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!file) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    if (file.deletedAt) {
+      res.status(400).json({ error: 'File is already in trash' });
+      return;
+    }
+
+    // 권한 체크
+    const superAdmin = isSuperAdmin(loginid);
+    const isOwner = file.createdBy === loginid;
+    const isTeamAdmin = file.space.team?.admins.some(a => a.userId === req.userId) ?? false;
+
+    if (!superAdmin && !isTeamAdmin && !isOwner) {
+      res.status(403).json({ error: 'Permission denied' });
+      return;
+    }
+
+    await prisma.file.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    // 감사 로그
+    await prisma.auditLog.create({
+      data: {
+        userId: req.userId!,
+        spaceId: file.spaceId,
+        action: 'DELETE_NOTE',
+        targetType: 'FILE',
+        targetId: file.id,
+        details: { movedToTrash: true },
+      },
+    });
+
+    res.json({ message: 'File moved to trash' });
+  } catch (error) {
+    console.error('Trash file error:', error);
+    res.status(500).json({ error: 'Failed to move file to trash' });
+  }
+});
+
+/**
  * 블록 배열을 마크다운으로 변환
  */
 function blocksToMarkdown(blocks: any[]): string {

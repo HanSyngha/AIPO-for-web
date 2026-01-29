@@ -1,7 +1,9 @@
 import { memo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TreeNode, useSpaceStore } from '../../stores/spaceStore';
+import { useAuthStore } from '../../stores/authStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { filesApi } from '../../services/api';
 import {
   DocumentTextIcon,
   EllipsisHorizontalIcon,
@@ -21,6 +23,7 @@ const translations = {
     share: '링크 공유',
     export: 'Markdown 내보내기',
     delete: '휴지통으로 이동',
+    deleteFailed: '파일 삭제에 실패했습니다.',
     languages: '사용 가능한 언어',
     KO: '한국어', EN: '영어', CN: '중국어',
   },
@@ -28,6 +31,7 @@ const translations = {
     share: 'Share link',
     export: 'Export as Markdown',
     delete: 'Move to trash',
+    deleteFailed: 'Failed to move file to trash.',
     languages: 'Available Languages',
     KO: 'Korean', EN: 'English', CN: 'Chinese',
   },
@@ -35,6 +39,7 @@ const translations = {
     share: '分享链接',
     export: '导出为 Markdown',
     delete: '移至回收站',
+    deleteFailed: '移至回收站失败。',
     languages: '可用语言',
     KO: '韩语', EN: '英语', CN: '中文',
   },
@@ -43,10 +48,14 @@ const translations = {
 function FileNode({ node, level }: FileNodeProps) {
   const navigate = useNavigate();
   const { fileId } = useParams();
-  const { setSelectedFileId } = useSpaceStore();
+  const { setSelectedFileId, refresh } = useSpaceStore();
+  const { user } = useAuthStore();
   const { language } = useSettingsStore();
   const t = translations[language];
   const [showMenu, setShowMenu] = useState(false);
+
+  // 권한 체크: Super Admin / Team Admin은 모든 파일, 일반 사용자는 본인 파일만
+  const canDelete = user?.isSuperAdmin || user?.isTeamAdmin || node.createdBy === user?.loginid;
 
   const paddingLeft = 12 + level * 16 + 14; // Extra padding for alignment
   const isSelected = fileId === node.id;
@@ -81,7 +90,7 @@ function FileNode({ node, level }: FileNodeProps) {
       >
         {/* File icon */}
         <DocumentTextIcon
-          className={`w-4.5 h-4.5 flex-shrink-0 ${
+          className={`w-[18px] h-[18px] flex-shrink-0 ${
             isSelected ? 'text-primary-600 dark:text-primary-400' : 'text-content-tertiary'
           }`}
         />
@@ -179,18 +188,29 @@ function FileNode({ node, level }: FileNodeProps) {
               </div>
             )}
 
-            <div className="py-1 border-t border-border-primary">
-              <button
-                onClick={() => {
-                  // TODO: Implement delete
-                  setShowMenu(false);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >
-                <TrashIcon className="w-4 h-4" />
-                {t.delete}
-              </button>
-            </div>
+            {canDelete && (
+              <div className="py-1 border-t border-border-primary">
+                <button
+                  onClick={async () => {
+                    setShowMenu(false);
+                    try {
+                      await filesApi.moveToTrash(node.id);
+                      if (isSelected) {
+                        setSelectedFileId(null);
+                        navigate('/');
+                      }
+                      refresh();
+                    } catch {
+                      alert(t.deleteFailed);
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                  {t.delete}
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

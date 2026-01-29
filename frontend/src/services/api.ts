@@ -71,6 +71,9 @@ export const filesApi = {
 
   retryTranslation: (fileId: string, lang: 'EN' | 'CN') =>
     api.post(`/files/${fileId}/retry-translation/${lang}`),
+
+  moveToTrash: (fileId: string) =>
+    api.post(`/files/${fileId}/trash`),
 };
 
 // ==================== Requests API ====================
