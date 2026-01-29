@@ -502,6 +502,105 @@ filesRoutes.post('/:id/trash', async (req: AuthenticatedRequest, res) => {
 });
 
 /**
+ * DELETE /folders/:id
+ * 폴더 삭제 (하위 파일은 휴지통으로, 하위 폴더는 재귀 삭제)
+ * - 개인 공간: 본인만
+ * - 팀 공간: Super Admin만
+ */
+filesRoutes.delete('/folders/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const folder = await prisma.folder.findUnique({
+      where: { id },
+      include: {
+        space: {
+          select: { id: true, userId: true, teamId: true },
+        },
+      },
+    });
+
+    if (!folder) {
+      res.status(404).json({ error: 'Folder not found' });
+      return;
+    }
+
+    const isPersonalSpace = folder.space.userId != null;
+    const superAdmin = isSuperAdmin(req.user!.loginid);
+
+    if (isPersonalSpace) {
+      // 개인 공간: 본인만 삭제 가능
+      if (folder.space.userId !== req.userId) {
+        res.status(403).json({ error: 'Permission denied' });
+        return;
+      }
+    } else {
+      // 팀 공간: Super Admin만 삭제 가능
+      if (!superAdmin) {
+        res.status(403).json({ error: 'Only super admin can delete team folders' });
+        return;
+      }
+    }
+
+    // 재귀적으로 하위 파일 soft delete + 폴더 hard delete
+    const deletedFileCount = await deleteFolderRecursive(folder.id);
+
+    // 감사 로그
+    await prisma.auditLog.create({
+      data: {
+        userId: req.userId!,
+        spaceId: folder.space.id,
+        action: 'DELETE_FOLDER',
+        targetType: 'FOLDER',
+        targetId: folder.id,
+        details: { path: folder.path, deletedFileCount },
+      },
+    });
+
+    res.json({ message: 'Folder deleted', deletedFileCount });
+  } catch (error) {
+    console.error('Delete folder error:', error);
+    res.status(500).json({ error: 'Failed to delete folder' });
+  }
+});
+
+/**
+ * 폴더 재귀 삭제: 하위 파일 soft delete, 하위 폴더 재귀 처리 후 폴더 hard delete
+ */
+async function deleteFolderRecursive(folderId: string): Promise<number> {
+  let deletedFileCount = 0;
+
+  // 하위 파일 soft delete (휴지통으로)
+  const files = await prisma.file.findMany({
+    where: { folderId, deletedAt: null },
+    select: { id: true },
+  });
+
+  if (files.length > 0) {
+    await prisma.file.updateMany({
+      where: { folderId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+    deletedFileCount += files.length;
+  }
+
+  // 하위 폴더 재귀 처리
+  const childFolders = await prisma.folder.findMany({
+    where: { parentId: folderId },
+    select: { id: true },
+  });
+
+  for (const child of childFolders) {
+    deletedFileCount += await deleteFolderRecursive(child.id);
+  }
+
+  // 폴더 자체 hard delete
+  await prisma.folder.delete({ where: { id: folderId } });
+
+  return deletedFileCount;
+}
+
+/**
  * 블록 배열을 마크다운으로 변환
  */
 function blocksToMarkdown(blocks: any[]): string {

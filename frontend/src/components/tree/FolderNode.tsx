@@ -1,12 +1,37 @@
 import { memo, useState, useRef, useEffect } from 'react';
 import { TreeNode, useSpaceStore } from '../../stores/spaceStore';
+import { useAuthStore } from '../../stores/authStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { foldersApi } from '../../services/api';
 import NoteTree from './NoteTree';
 import {
   FolderIcon,
   FolderOpenIcon,
   ChevronRightIcon,
   EllipsisHorizontalIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
+
+const translations = {
+  ko: {
+    expandAll: '모두 펼치기',
+    collapseAll: '모두 접기',
+    deleteFolder: '폴더 삭제',
+    deleteFailed: '폴더 삭제에 실패했습니다.',
+  },
+  en: {
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
+    deleteFolder: 'Delete folder',
+    deleteFailed: 'Failed to delete folder.',
+  },
+  cn: {
+    expandAll: '全部展开',
+    collapseAll: '全部折叠',
+    deleteFolder: '删除文件夹',
+    deleteFailed: '删除文件夹失败。',
+  },
+};
 
 interface FolderNodeProps {
   node: TreeNode;
@@ -14,7 +39,10 @@ interface FolderNodeProps {
 }
 
 function FolderNode({ node, level }: FolderNodeProps) {
-  const { expandedFolders, toggleFolder, expandFolder, collapseFolder } = useSpaceStore();
+  const { expandedFolders, toggleFolder, expandFolder, collapseFolder, activeTab, refresh } = useSpaceStore();
+  const { user } = useAuthStore();
+  const { language } = useSettingsStore();
+  const t = translations[language];
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
@@ -22,6 +50,9 @@ function FolderNode({ node, level }: FolderNodeProps) {
   const isExpanded = expandedFolders.has(node.id);
   const hasChildren = node.children && node.children.length > 0;
   const paddingLeft = 12 + level * 16;
+
+  // 폴더 삭제 권한: 개인 공간은 본인, 팀 공간은 Super Admin만
+  const canDeleteFolder = activeTab === 'personal' || user?.isSuperAdmin;
 
   const openMenu = (anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect();
@@ -82,6 +113,16 @@ function FolderNode({ node, level }: FolderNodeProps) {
     collapseFolder(node.id);
     for (const id of getAllChildFolderIds(node)) {
       collapseFolder(id);
+    }
+  };
+
+  const handleDeleteFolder = async () => {
+    setShowMenu(false);
+    try {
+      await foldersApi.delete(node.id);
+      refresh();
+    } catch {
+      alert(t.deleteFailed);
     }
   };
 
@@ -157,15 +198,27 @@ function FolderNode({ node, level }: FolderNodeProps) {
               onClick={handleExpandAll}
               className="w-full px-4 py-2 text-sm text-left text-content-secondary hover:bg-surface-secondary transition-colors"
             >
-              모두 펼치기
+              {t.expandAll}
             </button>
             <button
               onClick={handleCollapseAll}
               className="w-full px-4 py-2 text-sm text-left text-content-secondary hover:bg-surface-secondary transition-colors"
             >
-              모두 접기
+              {t.collapseAll}
             </button>
           </div>
+
+          {canDeleteFolder && (
+            <div className="py-1 border-t border-border-primary">
+              <button
+                onClick={handleDeleteFolder}
+                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                <TrashIcon className="w-4 h-4" />
+                {t.deleteFolder}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

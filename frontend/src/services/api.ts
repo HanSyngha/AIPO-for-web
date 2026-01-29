@@ -76,6 +76,11 @@ export const filesApi = {
     api.post(`/files/${fileId}/trash`),
 };
 
+// ==================== Folders API ====================
+export const foldersApi = {
+  delete: (folderId: string) => api.delete(`/files/folders/${folderId}`),
+};
+
 // ==================== Requests API ====================
 export const requestsApi = {
   input: (spaceId: string, input: string) =>

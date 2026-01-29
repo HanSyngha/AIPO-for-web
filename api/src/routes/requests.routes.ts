@@ -6,7 +6,7 @@
 
 import { Router } from 'express';
 import { prisma, io } from '../index.js';
-import { authenticateToken, AuthenticatedRequest, loadUserId, isSuperAdmin, requireTeamAdminOrHigher } from '../middleware/auth.js';
+import { authenticateToken, AuthenticatedRequest, loadUserId, isSuperAdmin } from '../middleware/auth.js';
 import { inputRateLimiter, searchRateLimiter } from '../middleware/rateLimit.js';
 import { addToQueue, getQueuePosition, cancelRequest } from '../services/queue/bull.service.js';
 
@@ -212,9 +212,11 @@ requestsRoutes.post('/search', searchRateLimiter, async (req: AuthenticatedReque
 
 /**
  * POST /requests/refactor
- * 폴더 구조 리팩토링 요청 (관리자 전용)
+ * 폴더 구조 리팩토링 요청
+ * - 개인 공간: 본인이 직접 요청 가능
+ * - 팀 공간: Super Admin 또는 Team Admin만
  */
-requestsRoutes.post('/refactor', requireTeamAdminOrHigher, async (req: AuthenticatedRequest, res) => {
+requestsRoutes.post('/refactor', async (req: AuthenticatedRequest, res) => {
   try {
     const { spaceId, instructions } = req.body;
 
@@ -223,15 +225,36 @@ requestsRoutes.post('/refactor', requireTeamAdminOrHigher, async (req: Authentic
       return;
     }
 
-    // 팀 관리자의 경우 본인 팀만 리팩토링 가능
-    if (!req.isSuperAdmin) {
-      const space = await prisma.space.findUnique({
-        where: { id: spaceId },
-        select: { teamId: true },
+    // 공간 접근 권한 확인
+    const canAccess = await canAccessSpace(req.userId!, req.user!.loginid, spaceId);
+    if (!canAccess) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // 공간 타입 확인
+    const space = await prisma.space.findUnique({
+      where: { id: spaceId },
+      select: { userId: true, teamId: true },
+    });
+
+    if (!space) {
+      res.status(404).json({ error: 'Space not found' });
+      return;
+    }
+
+    const isPersonalSpace = space.userId === req.userId;
+
+    // 팀 공간: Super Admin 또는 Team Admin만 허용
+    if (!isPersonalSpace && !isSuperAdmin(req.user!.loginid)) {
+      const user = await prisma.user.findUnique({
+        where: { loginid: req.user!.loginid },
+        include: { teamAdmins: { select: { teamId: true } } },
       });
 
-      if (!space?.teamId || !req.teamAdminTeamIds?.includes(space.teamId)) {
-        res.status(403).json({ error: 'You can only refactor your team space' });
+      const isTeamAdmin = user?.teamAdmins.some((ta: { teamId: string }) => ta.teamId === space.teamId);
+      if (!isTeamAdmin) {
+        res.status(403).json({ error: 'Team admin or higher access required for team space' });
         return;
       }
     }
