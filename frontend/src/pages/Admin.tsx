@@ -344,8 +344,14 @@ export default function Admin() {
         adminApi.getModels(),
         adminApi.getModelConfig(),
       ]);
-      setAvailableModels(modelsRes.data.models || []);
-      setModelConfig(configRes.data);
+      const models = modelsRes.data.models || [];
+      setAvailableModels(models);
+      const config = configRes.data;
+      // Redis에 설정이 없으면 첫 번째 모델을 기본으로 사용
+      if (!config.defaultModel && models.length > 0) {
+        config.defaultModel = models[0].id;
+      }
+      setModelConfig(config);
       setModelConfigDirty(false);
     } catch (error) {
       console.error('Failed to load models:', error);

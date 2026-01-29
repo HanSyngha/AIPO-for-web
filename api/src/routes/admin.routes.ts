@@ -458,8 +458,9 @@ adminRoutes.get('/model-config', requireTeamAdminOrHigher, async (_req: Authenti
   try {
     const configStr = await redis.get(MODEL_CONFIG_KEY);
     if (!configStr) {
+      // Redis에 설정 없으면 null 반환 → 프론트에서 첫 번째 모델로 대체
       res.json({
-        defaultModel: process.env.LLM_DEFAULT_MODEL || 'gpt-4o',
+        defaultModel: null,
         fallbackModels: [],
       });
       return;
