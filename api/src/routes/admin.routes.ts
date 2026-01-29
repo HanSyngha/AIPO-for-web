@@ -77,13 +77,101 @@ adminRoutes.get('/teams', requireTeamAdminOrHigher, async (req: AuthenticatedReq
 });
 
 /**
- * POST /admin/teams/:id/admins
- * 팀 관리자 지정 (Super Admin 전용)
+ * GET /admin/teams/:id/members
+ * 팀 멤버 목록 조회 (Team Admin: 본인 팀만, Super Admin: 전체)
  */
-adminRoutes.post('/teams/:id/admins', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+adminRoutes.get('/teams/:id/members', requireTeamAdminOrHigher, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id: teamId } = req.params;
+    const { page = 1, limit = 20, search } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Team Admin은 본인 팀만 조회 가능
+    if (!req.isSuperAdmin && req.teamAdminTeamIds && !req.teamAdminTeamIds.includes(teamId)) {
+      res.status(403).json({ error: 'Access denied to this team' });
+      return;
+    }
+
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team) {
+      res.status(404).json({ error: 'Team not found' });
+      return;
+    }
+
+    let memberWhere: any = { teamId };
+    if (search) {
+      memberWhere.user = {
+        OR: [
+          { loginid: { contains: search as string, mode: 'insensitive' } },
+          { username: { contains: search as string, mode: 'insensitive' } },
+          { deptname: { contains: search as string, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    const [members, total, teamAdmins] = await Promise.all([
+      prisma.teamMember.findMany({
+        where: memberWhere,
+        include: {
+          user: {
+            select: {
+              id: true,
+              loginid: true,
+              username: true,
+              deptname: true,
+              lastActive: true,
+            },
+          },
+        },
+        orderBy: { joinedAt: 'asc' },
+        skip,
+        take: Number(limit),
+      }),
+      prisma.teamMember.count({ where: memberWhere }),
+      prisma.teamAdmin.findMany({
+        where: { teamId },
+        select: { userId: true },
+      }),
+    ]);
+    const teamAdminUserIds = new Set(teamAdmins.map(ta => ta.userId));
+
+    res.json({
+      members: members.map(m => ({
+        id: m.user.id,
+        loginid: m.user.loginid,
+        username: m.user.username,
+        deptname: m.user.deptname,
+        lastActive: m.user.lastActive,
+        isTeamAdmin: teamAdminUserIds.has(m.user.id),
+        isSuperAdmin: isSuperAdmin(m.user.loginid),
+      })),
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get team members error:', error);
+    res.status(500).json({ error: 'Failed to get team members' });
+  }
+});
+
+/**
+ * POST /admin/teams/:id/admins
+ * 팀 관리자 지정 (Team Admin 이상, 본인 팀만)
+ */
+adminRoutes.post('/teams/:id/admins', requireTeamAdminOrHigher, async (req: AuthenticatedRequest, res) => {
   try {
     const { id: teamId } = req.params;
     const { loginid } = req.body;
+
+    // Team Admin은 본인 팀만 관리 가능
+    if (!req.isSuperAdmin && req.teamAdminTeamIds && !req.teamAdminTeamIds.includes(teamId)) {
+      res.status(403).json({ error: 'Access denied to this team' });
+      return;
+    }
 
     if (!loginid) {
       res.status(400).json({ error: 'loginid is required' });
@@ -106,6 +194,21 @@ adminRoutes.post('/teams/:id/admins', requireSuperAdmin, async (req: Authenticat
 
     if (!targetUser) {
       res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // 대상 사용자가 해당 팀 멤버인지 확인
+    const membership = await prisma.teamMember.findUnique({
+      where: {
+        userId_teamId: {
+          userId: targetUser.id,
+          teamId,
+        },
+      },
+    });
+
+    if (!membership) {
+      res.status(400).json({ error: 'User is not a member of this team' });
       return;
     }
 
@@ -138,6 +241,25 @@ adminRoutes.post('/teams/:id/admins', requireSuperAdmin, async (req: Authenticat
       },
     });
 
+    // 감사 로그 기록 (spaceId 포함하여 Team Admin도 조회 가능하도록)
+    const teamSpace = await prisma.space.findUnique({ where: { teamId } });
+    await prisma.auditLog.create({
+      data: {
+        action: 'GRANT_TEAM_ADMIN',
+        userId: req.userId!,
+        spaceId: teamSpace?.id,
+        targetType: 'team_admin',
+        targetId: targetUser.id,
+        details: {
+          teamId,
+          teamName: team.name,
+          targetLoginid: targetUser.loginid,
+          targetUsername: targetUser.username,
+          grantedBy: req.user!.loginid,
+        },
+      },
+    });
+
     res.status(201).json({
       admin: {
         id: admin.id,
@@ -155,11 +277,17 @@ adminRoutes.post('/teams/:id/admins', requireSuperAdmin, async (req: Authenticat
 
 /**
  * DELETE /admin/teams/:id/admins/:userId
- * 팀 관리자 해제 (Super Admin 전용)
+ * 팀 관리자 해제 (Team Admin 이상, 본인 팀만)
  */
-adminRoutes.delete('/teams/:id/admins/:userId', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+adminRoutes.delete('/teams/:id/admins/:userId', requireTeamAdminOrHigher, async (req: AuthenticatedRequest, res) => {
   try {
     const { id: teamId, userId } = req.params;
+
+    // Team Admin은 본인 팀만 관리 가능
+    if (!req.isSuperAdmin && req.teamAdminTeamIds && !req.teamAdminTeamIds.includes(teamId)) {
+      res.status(403).json({ error: 'Access denied to this team' });
+      return;
+    }
 
     const admin = await prisma.teamAdmin.findUnique({
       where: {
@@ -169,7 +297,8 @@ adminRoutes.delete('/teams/:id/admins/:userId', requireSuperAdmin, async (req: A
         },
       },
       include: {
-        user: { select: { username: true } },
+        user: { select: { loginid: true, username: true } },
+        team: { select: { name: true } },
       },
     });
 
@@ -178,11 +307,36 @@ adminRoutes.delete('/teams/:id/admins/:userId', requireSuperAdmin, async (req: A
       return;
     }
 
+    // Team Admin은 자기 자신의 권한을 해제할 수 없음 (Super Admin은 가능)
+    if (!req.isSuperAdmin && req.userId === userId) {
+      res.status(400).json({ error: 'Cannot revoke your own team admin role' });
+      return;
+    }
+
     await prisma.teamAdmin.delete({
       where: {
         userId_teamId: {
           userId,
           teamId,
+        },
+      },
+    });
+
+    // 감사 로그 기록 (spaceId 포함하여 Team Admin도 조회 가능하도록)
+    const revokeTeamSpace = await prisma.space.findUnique({ where: { teamId } });
+    await prisma.auditLog.create({
+      data: {
+        action: 'REVOKE_TEAM_ADMIN',
+        userId: req.userId!,
+        spaceId: revokeTeamSpace?.id,
+        targetType: 'team_admin',
+        targetId: userId,
+        details: {
+          teamId,
+          teamName: admin.team.name,
+          targetLoginid: admin.user.loginid,
+          targetUsername: admin.user.username,
+          revokedBy: req.user!.loginid,
         },
       },
     });
@@ -343,9 +497,9 @@ adminRoutes.get('/users', requireSuperAdmin, async (req: AuthenticatedRequest, r
     let where: any = {};
     if (search) {
       where.OR = [
-        { loginid: { contains: search as string } },
-        { username: { contains: search as string } },
-        { deptname: { contains: search as string } },
+        { loginid: { contains: search as string, mode: 'insensitive' } },
+        { username: { contains: search as string, mode: 'insensitive' } },
+        { deptname: { contains: search as string, mode: 'insensitive' } },
       ];
     }
 

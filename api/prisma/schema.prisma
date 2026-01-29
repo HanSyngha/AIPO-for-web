@@ -299,6 +299,8 @@ enum AuditAction {
   EXPORT_NOTE
   SHARE_LINK
   UPDATE_MODEL_CONFIG
+  GRANT_TEAM_ADMIN
+  REVOKE_TEAM_ADMIN
 }
 
 // ==================== 사용자 설정 ====================

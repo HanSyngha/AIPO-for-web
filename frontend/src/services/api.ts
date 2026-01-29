@@ -120,6 +120,9 @@ export const trashApi = {
 export const adminApi = {
   getTeams: () => api.get('/admin/teams'),
 
+  getTeamMembers: (teamId: string, params?: { page?: number; limit?: number; search?: string }) =>
+    api.get(`/admin/teams/${teamId}/members`, { params }),
+
   addTeamAdmin: (teamId: string, loginid: string) =>
     api.post(`/admin/teams/${teamId}/admins`, { loginid }),
 
