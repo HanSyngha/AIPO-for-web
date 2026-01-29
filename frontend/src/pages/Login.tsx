@@ -278,17 +278,30 @@ export default function Login() {
             <button
               onClick={handleLogin}
               disabled={isLoggingIn}
-              className="btn-primary text-base px-8 py-3 mx-auto lg:mx-0"
+              className="group relative inline-flex items-center justify-center gap-3
+                         px-10 py-4 text-base font-semibold text-white
+                         bg-gradient-to-r from-primary-600 via-primary-500 to-accent-purple
+                         rounded-2xl shadow-lg shadow-primary-500/25
+                         hover:shadow-xl hover:shadow-primary-500/30 hover:scale-[1.02]
+                         active:scale-[0.98]
+                         transition-all duration-200 ease-out
+                         disabled:opacity-60 disabled:pointer-events-none
+                         mx-auto lg:mx-0
+                         overflow-hidden"
             >
+              {/* Shine effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent
+                              translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
+
               {isLoggingIn ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {t.loggingIn}
+                  <span>{t.loggingIn}</span>
                 </>
               ) : (
                 <>
-                  {t.login}
-                  <ArrowRightIcon className="w-5 h-5" />
+                  <span>{t.login}</span>
+                  <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
                 </>
               )}
             </button>
