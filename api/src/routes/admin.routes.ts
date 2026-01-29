@@ -492,7 +492,8 @@ adminRoutes.put('/model-config', requireSuperAdmin, async (req: AuthenticatedReq
       data: {
         action: 'UPDATE_MODEL_CONFIG',
         userId: req.userId!,
-        details: JSON.stringify(config),
+        targetType: 'model_config',
+        details: config,
       },
     });
 
