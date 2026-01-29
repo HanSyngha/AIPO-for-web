@@ -229,13 +229,13 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
       return (
         <>
           {/* Textarea */}
-          <div className="px-6 py-4">
+          <div className="px-6 py-5">
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t.placeholder}
-              className="w-full h-40 resize-none input text-base"
+              className="w-full h-48 resize-none rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-base text-slate-900 dark:text-slate-100 p-4 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   handleSubmit();
@@ -245,7 +245,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
           </div>
 
           {/* Actions */}
-          <div className="px-6 py-4 bg-surface-secondary/50 border-t border-border-primary flex items-center justify-end gap-3">
+          <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-3">
             <button onClick={handleClose} className="btn-ghost">
               {t.close}
             </button>
@@ -421,7 +421,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -435,9 +435,9 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-lg bg-surface-primary rounded-2xl shadow-soft overflow-hidden">
+              <Dialog.Panel className="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-border-primary">
+                <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                   <div className="flex items-center justify-between">
                     <div>
                       <Dialog.Title className="text-lg font-semibold text-content-primary">
