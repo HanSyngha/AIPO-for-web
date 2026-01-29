@@ -115,6 +115,23 @@ export function getToolDefinitions() {
     {
       type: 'function',
       function: {
+        name: 'list_folder',
+        description: '특정 폴더의 직계 자식(하위 폴더 + 파일)만 반환합니다. 하위의 하위는 포함되지 않습니다. path를 "/"로 주면 루트 폴더 목록을 반환합니다.',
+        parameters: {
+          type: 'object',
+          properties: {
+            path: {
+              type: 'string',
+              description: '조회할 폴더 경로 (예: "/" 또는 "/프로젝트/회의록")',
+            },
+          },
+          required: ['path'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'read_file',
         description: '파일 내용을 읽습니다.',
         parameters: {
@@ -289,6 +306,9 @@ export async function executeTool(
 
       case 'undo_add_file':
         return await deleteFile(spaceId, args.path);
+
+      case 'list_folder':
+        return await listFolder(spaceId, args.path);
 
       case 'read_file':
         return await readFile(spaceId, args.path);
@@ -567,6 +587,72 @@ async function addFile(spaceId: string, path: string, content: string, loginid: 
     success: true,
     message: `File created: ${normalizedPath}`,
     data: { fileId: file.id, path: normalizedPath },
+  };
+}
+
+/**
+ * 폴더 직계 자식 조회 (하위 폴더 + 파일)
+ */
+async function listFolder(spaceId: string, path: string): Promise<ToolResult> {
+  const normalizedPath = normalizePath(path);
+  const isRoot = normalizedPath === '/';
+
+  // 직계 자식 폴더 조회
+  const childFolders = await prisma.folder.findMany({
+    where: {
+      spaceId,
+      parentId: isRoot ? null : undefined,
+      ...(isRoot ? {} : {
+        path: { startsWith: normalizedPath + '/' },
+      }),
+    },
+    select: { path: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+
+  // 직계만 필터 (depth가 정확히 1단계 더 깊은 것만)
+  const targetDepth = isRoot ? 1 : normalizedPath.split('/').filter(Boolean).length + 1;
+  const directChildFolders = childFolders.filter(f => {
+    const depth = f.path.split('/').filter(Boolean).length;
+    return depth === targetDepth;
+  });
+
+  // 직계 자식 파일 조회
+  let directChildFiles;
+  if (isRoot) {
+    directChildFiles = await prisma.file.findMany({
+      where: { spaceId, folderId: null, deletedAt: null },
+      select: { path: true, name: true, id: true },
+      orderBy: { name: 'asc' },
+    });
+  } else {
+    const folder = await prisma.folder.findUnique({
+      where: { spaceId_path: { spaceId, path: normalizedPath } },
+    });
+    if (!folder) {
+      return { success: false, message: `Folder not found: ${normalizedPath}`, error: 'NOT_FOUND' };
+    }
+    directChildFiles = await prisma.file.findMany({
+      where: { spaceId, folderId: folder.id, deletedAt: null },
+      select: { path: true, name: true, id: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  const folders = directChildFolders.map(f => `📁 ${f.name}`);
+  const files = directChildFiles.map(f => `📄 ${f.name} (${f.path})`);
+
+  const listing = [...folders, ...files];
+
+  return {
+    success: true,
+    message: `Listed ${normalizedPath}: ${directChildFolders.length} folders, ${directChildFiles.length} files`,
+    data: {
+      path: normalizedPath,
+      folders: directChildFolders.map(f => ({ name: f.name, path: f.path })),
+      files: directChildFiles.map(f => ({ name: f.name, path: f.path, fileId: f.id })),
+      listing: listing.length > 0 ? listing.join('\n') : '(비어있음)',
+    },
   };
 }
 

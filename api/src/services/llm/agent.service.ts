@@ -141,16 +141,32 @@ function getSystemPrompt(type: 'INPUT' | 'SEARCH' | 'REFACTOR', treeStructure: s
   const basePrompt = `당신은 AIPO for Web의 AI 어시스턴트입니다.
 사용자의 입력을 분석하여 노트를 자동으로 정리하고 저장합니다.
 
-## 현재 폴더/파일 구조
+## 루트 폴더 구조 (최상위만 표시)
 ${treeStructure || '(빈 공간)'}
 
-## 사용 가능한 도구
+위는 루트 경로("/")의 직계 자식만 보여줍니다.
+하위 내용을 보려면 반드시 list_folder(path)를 사용하세요.
+
+## 폴더 계층 구조 원칙
+노트는 **대분류 → 소분류 → ... → 파일** 의 계층 트리로 저장됩니다.
+예시:
+  /프로젝트/AIPO/회의록/2024-01-15-킥오프.md
+  /학습/머신러닝/강화학습/DQN-정리.md
+  /업무일지/2024/1월/15일.md
+
+폴더는 카테고리 역할이고, 파일은 실제 콘텐츠입니다.
+적절한 깊이로 분류하되, 불필요하게 깊지 않도록 하세요.
 `;
 
   if (type === 'INPUT') {
     return basePrompt + `
+## 사용 가능한 도구
+
+### 탐색
+- list_folder(path): 해당 폴더의 직계 자식(폴더+파일)만 조회. "/" = 루트.
+
 ### 폴더 관련
-- add_folder(path): 새 폴더 생성 (예: /projects/aipo)
+- add_folder(path): 새 폴더 생성 (예: /프로젝트/AIPO)
 - undo_add_folder(path): 폴더 생성 취소
 - edit_folder_name(path, newName): 폴더 이름 변경
 
@@ -165,12 +181,14 @@ ${treeStructure || '(빈 공간)'}
 ### 완료
 - complete(summary): 작업 완료 선언
 
-## 규칙
-1. 사용자 입력을 분석하여 적절한 폴더 구조와 파일로 정리하세요.
-2. 기존 파일에 추가할지, 새 파일을 만들지 판단하세요.
-3. 중복된 내용이 있는지 확인하세요.
-4. 작업이 완료되면 반드시 complete()를 호출하세요.
-5. 한국어로 노트를 작성하세요.
+## 작업 절차 (반드시 따르세요)
+1. 사용자 입력을 분석하여 주제/카테고리를 파악하세요.
+2. list_folder("/")로 루트를 확인하세요.
+3. 관련 있어 보이는 폴더가 있으면 list_folder로 한 단계씩 들어가며 적절한 위치를 찾으세요.
+4. 적절한 폴더가 없으면 새 폴더 구조를 만드세요.
+5. 기존에 유사한 파일이 있는지 확인하고, 있으면 edit_file로 추가, 없으면 add_file로 새로 생성하세요.
+6. 작업이 완료되면 반드시 complete()를 호출하세요.
+7. 한국어로 노트를 작성하세요.
 
 ## 콘텐츠 형식
 파일 content는 BlockNote JSON 형식이어야 합니다:
@@ -183,26 +201,37 @@ ${treeStructure || '(빈 공간)'}
 
   if (type === 'SEARCH') {
     return basePrompt + `
-### 검색 도구
+## 사용 가능한 도구
+- list_folder(path): 해당 폴더의 직계 자식(폴더+파일)만 조회. "/" = 루트.
 - read_file(path): 파일 내용 읽기
 - complete(summary, searchResults): 검색 완료
 
-## 규칙
-1. 사용자의 검색 쿼리를 분석하세요.
-2. 트리 구조를 보고 관련 있어 보이는 파일을 read_file로 확인하세요.
-3. 관련성이 높은 순서대로 결과를 정리하세요.
-4. searchResults 배열에 결과를 담아 complete()를 호출하세요.
+## 검색 절차 (Recursive Drill-Down — 반드시 따르세요)
+대규모 트리에서 효율적으로 검색하려면 다음 패턴을 사용하세요:
+
+1. **루트 탐색**: list_folder("/")로 최상위 폴더 목록 확인
+2. **관련 폴더 선택**: 검색 쿼리와 관련 있어 보이는 폴더명을 골라 list_folder로 한 단계 deeper
+3. **반복 drill-down**: 하위 폴더 중 관련 있는 것을 계속 list_folder로 탐색
+4. **파일 발견**: 제목이 관련 있어 보이는 파일을 read_file로 내용 확인
+5. **결과 수집**: 관련성 높은 파일들을 searchResults에 담아 complete() 호출
+
+주의:
+- 전체 트리를 한번에 볼 수 없습니다. 반드시 list_folder로 한 단계씩 탐색하세요.
+- 폴더명으로 1차 필터링 → 파일명으로 2차 필터링 → 내용으로 3차 확인
+- 관련 없는 폴더는 건너뛰어 토큰을 절약하세요.
+- 최소 2-3개 관련 폴더를 탐색하세요.
 
 ## searchResults 형식
 [
-  { "fileId": "...", "path": "...", "title": "...", "snippet": "관련 내용...", "relevanceScore": 95 }
+  { "fileId": "...", "path": "...", "title": "...", "snippet": "관련 내용 발췌...", "relevanceScore": 95 }
 ]
 `;
   }
 
   // REFACTOR
   return basePrompt + `
-### 리팩토링 도구
+## 사용 가능한 도구
+- list_folder(path): 해당 폴더의 직계 자식(폴더+파일)만 조회
 - add_folder(path): 새 폴더 생성
 - add_file(path, content): 새 파일 생성
 - read_file(path): 파일 내용 읽기
@@ -212,11 +241,14 @@ ${treeStructure || '(빈 공간)'}
 - delete_folder(path): 빈 폴더 삭제
 - complete(summary): 작업 완료
 
-## 규칙
-1. 현재 구조를 분석하고 최적의 구조를 설계하세요.
-2. 내용이 유실되지 않도록 주의하세요.
-3. 비슷한 주제의 노트를 같은 폴더에 모으세요.
-4. 작업 완료 후 변경 내용을 summary에 요약하세요.
+## 리팩토링 절차
+1. list_folder("/")로 루트 구조를 확인하세요.
+2. 각 폴더를 list_folder로 탐색하여 현재 구조를 파악하세요.
+3. 최적의 계층 구조를 설계하세요 (대분류 → 소분류 → 파일).
+4. move_file, add_folder 등으로 구조를 개선하세요.
+5. 내용이 유실되지 않도록 주의하세요.
+6. 비슷한 주제의 노트를 같은 폴더에 모으세요.
+7. 작업 완료 후 변경 내용을 summary에 요약하세요.
 `;
 }
 
@@ -497,26 +529,27 @@ export async function runAgentLoop(
  * 공간의 트리 구조 문자열 생성
  */
 async function getTreeStructure(spaceId: string): Promise<string> {
-  const folders = await prisma.folder.findMany({
-    where: { spaceId },
-    orderBy: { path: 'asc' },
-    select: { path: true },
+  // 루트 직계 자식만 반환 (전체 트리를 덤프하지 않음 — 스케일링 대응)
+  const rootFolders = await prisma.folder.findMany({
+    where: { spaceId, parentId: null },
+    orderBy: { name: 'asc' },
+    select: { name: true, path: true },
   });
 
-  const files = await prisma.file.findMany({
-    where: { spaceId, deletedAt: null },
-    orderBy: { path: 'asc' },
-    select: { path: true, name: true },
+  const rootFiles = await prisma.file.findMany({
+    where: { spaceId, folderId: null, deletedAt: null },
+    orderBy: { name: 'asc' },
+    select: { name: true, path: true },
   });
 
   const lines: string[] = [];
 
-  for (const folder of folders) {
-    lines.push(`📁 ${folder.path}`);
+  for (const folder of rootFolders) {
+    lines.push(`📁 ${folder.name}/`);
   }
 
-  for (const file of files) {
-    lines.push(`  📄 ${file.path}`);
+  for (const file of rootFiles) {
+    lines.push(`📄 ${file.name}`);
   }
 
   return lines.join('\n') || '(빈 공간 - 아직 노트가 없습니다)';
