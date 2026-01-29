@@ -113,15 +113,15 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/spaces', spacesRoutes);
-app.use('/api/files', filesRoutes);
-app.use('/api/requests', requestsRoutes);
-app.use('/api/comments', commentsRoutes);
-app.use('/api/trash', trashRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/settings', settingsRoutes);
+// API Routes (nginx strips /api/ prefix)
+app.use('/auth', authRoutes);
+app.use('/spaces', spacesRoutes);
+app.use('/files', filesRoutes);
+app.use('/requests', requestsRoutes);
+app.use('/comments', commentsRoutes);
+app.use('/trash', trashRoutes);
+app.use('/admin', adminRoutes);
+app.use('/settings', settingsRoutes);
 
 // Setup Swagger API docs
 setupSwagger(app);
