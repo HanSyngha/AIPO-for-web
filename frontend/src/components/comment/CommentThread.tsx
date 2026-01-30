@@ -97,7 +97,11 @@ export default function CommentThread({ fileId, blockId }: CommentThreadProps) {
     setIsLoading(true);
     try {
       const response = await commentsApi.getForFile(fileId);
-      setComments(response.data.comments || []);
+      // API는 블록별 그룹화된 객체를 반환 { "blockId": [comments] }
+      // 플랫 배열로 변환
+      const grouped = response.data.comments || {};
+      const flat = Object.values(grouped).flat() as Comment[];
+      setComments(flat);
     } catch (error) {
       console.error('Failed to load comments:', error);
     } finally {
