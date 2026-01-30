@@ -244,6 +244,7 @@ ${isPersonalSpace ? '\n### 개인 공간 폴더 깊이 제한\n이 공간은 **�
 - complete(summary): 작업 완료 선언
 
 ## 필수 규칙 (절대 위반 금지)
+- **한 번에 하나의 도구만 호출하세요.** 여러 도구를 동시에 호출하지 마세요.
 - 폴더만 만들고 끝내면 안 됩니다. 반드시 최소 1개 이상의 파일을 add_file로 생성하거나 edit_file로 수정해야 합니다.
 - add_file의 content는 반드시 사용자 입력 내용이 반영된 실질적인 내용이어야 합니다. 빈 배열 []이나 제목만 있는 파일은 금지합니다.
 - complete() 호출 전 반드시 파일 생성/수정이 1회 이상 이루어졌는지 확인하세요. 하지 않았다면 반드시 파일을 먼저 생성/수정하세요.
@@ -346,6 +347,7 @@ async function callLLMWithModel(
       messages,
       tools,
       tool_choice: 'required',
+      parallel_tool_calls: false,
     }),
   });
 
@@ -498,143 +500,102 @@ export async function runAgentLoop(
         tool_calls: assistantMessage.tool_calls,
       });
 
-      // Tool call 처리
+      // Tool call 처리 — 한 번에 하나만 (parallel_tool_calls: false 방어)
       if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        for (const toolCall of assistantMessage.tool_calls) {
-          const toolName = toolCall.function.name;
-          let toolArgs: Record<string, any>;
+        if (assistantMessage.tool_calls.length > 1) {
+          console.warn(`[Agent] LLM returned ${assistantMessage.tool_calls.length} tool calls, processing only first one`);
+          // assistant 메시지의 tool_calls도 첫 번째만 유지 (히스토리 정합성)
+          assistantMessage.tool_calls = [assistantMessage.tool_calls[0]];
+          messages[messages.length - 1].tool_calls = assistantMessage.tool_calls;
+        }
 
+        const toolCall = assistantMessage.tool_calls[0];
+        const toolName = toolCall.function.name;
+        let toolArgs: Record<string, any>;
+
+        try {
+          toolArgs = JSON.parse(toolCall.function.arguments);
+        } catch (parseErr) {
+          console.error(`[Agent] Failed to parse tool arguments for ${toolName}:`, toolCall.function.arguments?.substring(0, 200));
+          // JSON 파싱 실패 → 에러 응답으로 LLM에게 재시도 유도
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolName,
+            content: JSON.stringify({ success: false, message: 'Invalid JSON arguments. Please retry with valid JSON.', error: 'INVALID_JSON' }),
+          });
+          continue; // 다음 iteration으로
+        }
+
+        console.log(`[Agent] Tool call: ${toolName}`, toolArgs);
+
+        // ask_to_user 처리: WebSocket으로 질문 전송 후 응답 대기
+        if (toolName === 'ask_to_user') {
+          emitAskUser(io, requestId, {
+            question: toolArgs.question,
+            options: toolArgs.options,
+            timeoutMs: 180_000,
+          });
+
+          let userAnswer: string;
           try {
-            toolArgs = JSON.parse(toolCall.function.arguments);
-          } catch (parseErr) {
-            console.error(`[Agent] Failed to parse tool arguments for ${toolName}:`, toolCall.function.arguments?.substring(0, 200));
-            // JSON 파싱 실패한 도구는 에러 응답으로 LLM에게 재시도 유도
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              name: toolName,
-              content: JSON.stringify({ success: false, message: 'Invalid JSON arguments. Please retry with valid JSON.', error: 'INVALID_JSON' }),
+            userAnswer = await new Promise<string>((resolve, reject) => {
+              pendingQuestions.set(requestId, { resolve, reject });
+              setTimeout(() => {
+                if (pendingQuestions.has(requestId)) {
+                  pendingQuestions.delete(requestId);
+                  reject(new Error('ASK_USER_TIMEOUT'));
+                }
+              }, 180_000);
             });
-            continue;
-          }
-
-          console.log(`[Agent] Tool call: ${toolName}`, toolArgs);
-
-          // ask_to_user 처리: WebSocket으로 질문 전송 후 응답 대기
-          if (toolName === 'ask_to_user') {
-            emitAskUser(io, requestId, {
-              question: toolArgs.question,
-              options: toolArgs.options,
-              timeoutMs: 180_000,
-            });
-
-            let userAnswer: string;
-            try {
-              userAnswer = await new Promise<string>((resolve, reject) => {
-                pendingQuestions.set(requestId, { resolve, reject });
-                setTimeout(() => {
-                  if (pendingQuestions.has(requestId)) {
-                    pendingQuestions.delete(requestId);
-                    reject(new Error('ASK_USER_TIMEOUT'));
-                  }
-                }, 180_000);
+          } catch (err) {
+            if ((err as Error).message === 'ASK_USER_TIMEOUT') {
+              console.log(`[Agent] ask_to_user timeout for request ${requestId}, reverting ${undoStack.length} changes`);
+              await revertChanges(spaceId, undoStack);
+              await prisma.request.update({
+                where: { id: requestId },
+                data: { status: 'CANCELLED', error: 'User response timeout' },
               });
-            } catch (err) {
-              if ((err as Error).message === 'ASK_USER_TIMEOUT') {
-                console.log(`[Agent] ask_to_user timeout for request ${requestId}, reverting ${undoStack.length} changes`);
-                await revertChanges(spaceId, undoStack);
-                await prisma.request.update({
-                  where: { id: requestId },
-                  data: { status: 'CANCELLED', error: 'User response timeout' },
-                });
-                await sendFailureEmail(
-                  request.user.loginid,
-                  request.user.username,
-                  '응답 시간 초과',
-                  'AI가 질문을 보냈으나 3분 내에 응답이 없어 작업이 취소되었습니다. 진행 중이던 모든 변경이 원복되었습니다.'
-                );
-                emitRequestFailed(io, requestId, request.user.loginid, '응답 시간 초과로 작업이 취소되었습니다.');
-                throw new Error('User response timeout - all changes reverted');
-              }
-              throw err;
+              await sendFailureEmail(
+                request.user.loginid,
+                request.user.username,
+                '응답 시간 초과',
+                'AI가 질문을 보냈으나 3분 내에 응답이 없어 작업이 취소되었습니다. 진행 중이던 모든 변경이 원복되었습니다.'
+              );
+              emitRequestFailed(io, requestId, request.user.loginid, '응답 시간 초과로 작업이 취소되었습니다.');
+              throw new Error('User response timeout - all changes reverted');
             }
-
-            // 응답을 tool result로 LLM에 전달
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              name: 'ask_to_user',
-              content: JSON.stringify({ success: true, message: `사용자 응답: ${userAnswer}` }),
-            });
-
-            await prisma.requestLog.create({
-              data: {
-                requestId,
-                iteration,
-                tool: toolName,
-                params: JSON.stringify(toolArgs),
-                result: JSON.stringify({ answer: userAnswer }),
-                success: true,
-                duration: 0,
-              },
-            });
-
-            continue;
+            throw err;
           }
 
-          // complete() 호출 시 종료
-          if (toolName === 'complete') {
-            result.summary = toolArgs.summary;
-            if (toolArgs.searchResults) {
-              result.searchResults = toolArgs.searchResults;
-            }
+          // 응답을 tool result로 LLM에 전달
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: 'ask_to_user',
+            content: JSON.stringify({ success: true, message: `사용자 응답: ${userAnswer}` }),
+          });
 
-            // 로그 기록
-            await prisma.requestLog.create({
-              data: {
-                requestId,
-                iteration,
-                tool: toolName,
-                params: JSON.stringify(toolArgs),
-                result: 'completed',
-                success: true,
-              },
-            });
+          await prisma.requestLog.create({
+            data: {
+              requestId,
+              iteration,
+              tool: toolName,
+              params: JSON.stringify(toolArgs),
+              result: JSON.stringify({ answer: userAnswer }),
+              success: true,
+              duration: 0,
+            },
+          });
 
-            return result;
-          }
+          continue; // 다음 iteration으로
+        }
 
-          // 도구 실행
-          const startTime = Date.now();
-          const toolResult = await executeTool(spaceId, toolName, toolArgs, request.user.loginid);
-          const duration = Date.now() - startTime;
-
-          // 결과 추적 + Undo 스택
-          if (toolResult.success) {
-            if (toolName === 'add_file') {
-              result.filesCreated.push(toolArgs.path);
-              undoStack.push({ tool: 'undo_add_file', params: { path: toolArgs.path } });
-            } else if (toolName === 'edit_file') {
-              result.filesModified.push(toolArgs.path);
-              undoStack.push({ tool: 'edit_file', params: { path: toolArgs.path, before: toolArgs.after, after: toolArgs.before } });
-            } else if (toolName === 'add_folder') {
-              result.foldersCreated.push(toolArgs.path);
-              undoStack.push({ tool: 'undo_add_folder', params: { path: toolArgs.path } });
-            } else if (toolName === 'move_file') {
-              undoStack.push({ tool: 'move_file', params: { fromPath: toolArgs.toPath, toPath: toolArgs.fromPath } });
-            } else if (toolName === 'edit_file_name') {
-              const oldName = toolArgs.path.split('/').pop() || '';
-              const parentPath = toolArgs.path.substring(0, toolArgs.path.lastIndexOf('/'));
-              const newPath = parentPath + '/' + toolArgs.newName;
-              undoStack.push({ tool: 'edit_file_name', params: { path: newPath, newName: oldName } });
-            } else if (toolName === 'edit_folder_name') {
-              const oldName = toolArgs.path.split('/').pop() || '';
-              const parentPath = toolArgs.path.substring(0, toolArgs.path.lastIndexOf('/'));
-              const newPath = parentPath + '/' + toolArgs.newName;
-              undoStack.push({ tool: 'edit_folder_name', params: { path: newPath, newName: oldName } });
-            } else if (toolName === 'delete_file' && toolResult.data?.fileId) {
-              undoStack.push({ tool: 'restore_file', params: { fileId: toolResult.data.fileId } });
-            }
+        // complete() 호출 시 종료
+        if (toolName === 'complete') {
+          result.summary = toolArgs.summary;
+          if (toolArgs.searchResults) {
+            result.searchResults = toolArgs.searchResults;
           }
 
           // 로그 기록
@@ -644,20 +605,67 @@ export async function runAgentLoop(
               iteration,
               tool: toolName,
               params: JSON.stringify(toolArgs),
-              result: JSON.stringify(toolResult),
-              success: toolResult.success,
-              duration,
+              result: 'completed',
+              success: true,
             },
           });
 
-          // Tool 응답 히스토리에 추가
-          messages.push({
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            name: toolName,
-            content: JSON.stringify(toolResult),
-          });
+          return result;
         }
+
+        // 도구 실행
+        const startTime = Date.now();
+        const toolResult = await executeTool(spaceId, toolName, toolArgs, request.user.loginid);
+        const duration = Date.now() - startTime;
+
+        // 결과 추적 + Undo 스택
+        if (toolResult.success) {
+          if (toolName === 'add_file') {
+            result.filesCreated.push(toolArgs.path);
+            undoStack.push({ tool: 'undo_add_file', params: { path: toolArgs.path } });
+          } else if (toolName === 'edit_file') {
+            result.filesModified.push(toolArgs.path);
+            undoStack.push({ tool: 'edit_file', params: { path: toolArgs.path, before: toolArgs.after, after: toolArgs.before } });
+          } else if (toolName === 'add_folder') {
+            result.foldersCreated.push(toolArgs.path);
+            undoStack.push({ tool: 'undo_add_folder', params: { path: toolArgs.path } });
+          } else if (toolName === 'move_file') {
+            undoStack.push({ tool: 'move_file', params: { fromPath: toolArgs.toPath, toPath: toolArgs.fromPath } });
+          } else if (toolName === 'edit_file_name') {
+            const oldName = toolArgs.path.split('/').pop() || '';
+            const parentPath = toolArgs.path.substring(0, toolArgs.path.lastIndexOf('/'));
+            const newPath = parentPath + '/' + toolArgs.newName;
+            undoStack.push({ tool: 'edit_file_name', params: { path: newPath, newName: oldName } });
+          } else if (toolName === 'edit_folder_name') {
+            const oldName = toolArgs.path.split('/').pop() || '';
+            const parentPath = toolArgs.path.substring(0, toolArgs.path.lastIndexOf('/'));
+            const newPath = parentPath + '/' + toolArgs.newName;
+            undoStack.push({ tool: 'edit_folder_name', params: { path: newPath, newName: oldName } });
+          } else if (toolName === 'delete_file' && toolResult.data?.fileId) {
+            undoStack.push({ tool: 'restore_file', params: { fileId: toolResult.data.fileId } });
+          }
+        }
+
+        // 로그 기록
+        await prisma.requestLog.create({
+          data: {
+            requestId,
+            iteration,
+            tool: toolName,
+            params: JSON.stringify(toolArgs),
+            result: JSON.stringify(toolResult),
+            success: toolResult.success,
+            duration,
+          },
+        });
+
+        // Tool 응답 히스토리에 추가
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          name: toolName,
+          content: JSON.stringify(toolResult),
+        });
       } else {
         // tool_choice=required인데 tool call 없이 응답 → 에러로 간주하여 retry
         console.warn(`[Agent] LLM returned no tool call (tool_choice=required), treating as error`);

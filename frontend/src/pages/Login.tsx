@@ -29,6 +29,8 @@ const translations = {
     feature3Desc: '팀 공간에서 함께 공유',
     copyright: '© 2026 ONCE. Developed by syngha.han',
     tagline: 'Organized Notes Categorized Effortlessly',
+    notice: '개인 프로젝트 | 버그 제보:',
+    contact: 'syngha.han',
   },
   en: {
     title: 'ONCE',
@@ -45,6 +47,8 @@ const translations = {
     feature3Desc: 'Share in team spaces',
     copyright: '© 2026 ONCE. Developed by syngha.han',
     tagline: 'Organized Notes Categorized Effortlessly',
+    notice: 'Personal project | Bug report:',
+    contact: 'syngha.han',
   },
   cn: {
     title: 'ONCE',
@@ -61,6 +65,8 @@ const translations = {
     feature3Desc: '在团队空间中共享',
     copyright: '© 2026 ONCE. Developed by syngha.han',
     tagline: 'Organized Notes Categorized Effortlessly',
+    notice: '个人项目 | 错误反馈:',
+    contact: 'syngha.han',
   },
 };
 
@@ -367,9 +373,22 @@ export default function Login() {
       </main>
 
       {/* Footer */}
-      <footer className="py-6 text-center">
-        <p className="text-xs text-content-quaternary/60 mb-1">{t.tagline}</p>
+      <footer className="py-6 text-center space-y-1">
+        <p className="text-xs text-content-quaternary/60">{t.tagline}</p>
         <p className="text-sm text-content-quaternary">{t.copyright}</p>
+        <p className="text-[10px] text-content-quaternary/40">
+          {t.notice}{' '}
+          <a
+            href="http://a2g.samsungds.net:4090/feedback"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-content-quaternary/60 transition-colors"
+          >
+            Feedback
+          </a>
+          {' / '}
+          {t.contact}
+        </p>
       </footer>
     </div>
   );
