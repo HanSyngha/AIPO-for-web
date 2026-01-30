@@ -475,12 +475,6 @@ async function deleteFolder(spaceId: string, path: string): Promise<ToolResult> 
     return { success: false, message: `Folder is not empty: ${normalizedPath}`, error: 'NOT_EMPTY' };
   }
 
-  // 개인 공간의 Todo 폴더는 삭제 불가
-  const space = await prisma.space.findUnique({ where: { id: spaceId } });
-  if (space?.userId && normalizedPath === '/Todo') {
-    return { success: false, message: 'Todo folder cannot be deleted', error: 'PROTECTED' };
-  }
-
   await prisma.folder.delete({
     where: { id: folder.id },
   });
@@ -503,12 +497,6 @@ async function editFolderName(spaceId: string, path: string, newName: string): P
 
   if (!folder) {
     return { success: false, message: `Folder not found: ${normalizedPath}`, error: 'NOT_FOUND' };
-  }
-
-  // 개인 공간의 Todo 폴더는 이름 변경 불가
-  const space = await prisma.space.findUnique({ where: { id: spaceId } });
-  if (space?.userId && normalizedPath === '/Todo') {
-    return { success: false, message: 'Todo folder cannot be renamed', error: 'PROTECTED' };
   }
 
   // 새 경로 계산

@@ -16,15 +16,15 @@ import {
 const translations = {
   ko: {
     title: 'ONCE',
-    subtitle: '작성하기 귀찮을 때 쓰는 지식 공유 서비스',
+    subtitle: '작성하기 귀찮을 때 쓰는\n지식 공유 & 할일 관리 서비스',
     description:
-      '아무거나 입력하면 AI가 자동으로 정리해드립니다. 회의록, 아이디어, 메모, 뭐든지 괜찮아요.',
+      '아무거나 입력하면 AI가 자동으로 정리하고, 할일까지 추출해드립니다. 회의록, 아이디어, 메모, 뭐든지 괜찮아요.',
     login: 'SSO 로그인',
     loggingIn: '로그인 중...',
     feature1: '자동 정리',
     feature1Desc: '입력한 내용을 AI가 구조화',
-    feature2: '다국어 지원',
-    feature2Desc: '한국어, 영어, 중국어 자동 번역',
+    feature2: '할일 자동화',
+    feature2Desc: 'AI가 할일을 자동 추출·관리',
     feature3: '팀 협업',
     feature3Desc: '팀 공간에서 함께 공유',
     copyright: '© 2026 ONCE. Developed by syngha.han',
@@ -32,15 +32,15 @@ const translations = {
   },
   en: {
     title: 'ONCE',
-    subtitle: 'Knowledge sharing for the lazy writer',
+    subtitle: 'Knowledge sharing &\ntodo management for the lazy',
     description:
-      'Just type anything and AI will organize it for you. Meeting notes, ideas, memos - anything works.',
+      'Just type anything and AI will organize it and extract action items for you. Meeting notes, ideas, memos - anything works.',
     login: 'SSO Login',
     loggingIn: 'Logging in...',
     feature1: 'Auto-organize',
     feature1Desc: 'AI structures your content',
-    feature2: 'Multi-language',
-    feature2Desc: 'Korean, English, Chinese translation',
+    feature2: 'Auto Todo',
+    feature2Desc: 'AI extracts & manages your tasks',
     feature3: 'Team Collaboration',
     feature3Desc: 'Share in team spaces',
     copyright: '© 2026 ONCE. Developed by syngha.han',
@@ -48,15 +48,15 @@ const translations = {
   },
   cn: {
     title: 'ONCE',
-    subtitle: '懒人专用知识共享服务',
+    subtitle: '懒人专用\n知识共享 & 待办管理服务',
     description:
-      '随意输入，AI 自动整理。会议记录、创意、备忘录，什么都可以。',
+      '随意输入，AI 自动整理并提取待办事项。会议记录、创意、备忘录，什么都可以。',
     login: 'SSO 登录',
     loggingIn: '登录中...',
     feature1: '自动整理',
     feature1Desc: 'AI 结构化您的内容',
-    feature2: '多语言支持',
-    feature2Desc: '韩语、英语、中文自动翻译',
+    feature2: '待办自动化',
+    feature2Desc: 'AI 自动提取和管理待办事项',
     feature3: '团队协作',
     feature3Desc: '在团队空间中共享',
     copyright: '© 2026 ONCE. Developed by syngha.han',
@@ -244,7 +244,7 @@ export default function Login() {
               AI-Powered
             </div>
 
-            <h1 className="text-4xl lg:text-5xl font-bold text-content-primary mb-4 leading-tight">
+            <h1 className="text-4xl lg:text-5xl font-bold text-content-primary mb-4 leading-tight whitespace-pre-line">
               {t.subtitle}
             </h1>
 

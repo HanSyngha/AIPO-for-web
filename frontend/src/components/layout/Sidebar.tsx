@@ -148,18 +148,7 @@ export default function Sidebar() {
             </button>
           )}
 
-          <div className="flex-1" />
-
-          {/* New note button */}
-          <button
-            onClick={handleNewNote}
-            className="p-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors shadow-soft"
-            title={t.newNote}
-          >
-            <PlusIcon className="w-5 h-5" />
-          </button>
-
-          {/* Todo (개인 공간만) */}
+          {/* Todo (개인 공간 탭 바로 아래) */}
           {activeTab === 'personal' && (
             <button
               onClick={() => navigate('/todo')}
@@ -173,6 +162,17 @@ export default function Sidebar() {
               <ClipboardDocumentListIcon className="w-5 h-5" />
             </button>
           )}
+
+          <div className="flex-1" />
+
+          {/* New note button */}
+          <button
+            onClick={handleNewNote}
+            className="p-2.5 rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors shadow-soft"
+            title={t.newNote}
+          >
+            <PlusIcon className="w-5 h-5" />
+          </button>
 
           {/* Trash */}
           <button
@@ -243,6 +243,21 @@ export default function Sidebar() {
           )}
         </div>
 
+        {/* Todo link (개인 공간 탭 바로 아래) */}
+        {activeTab === 'personal' && (
+          <button
+            onClick={() => navigate('/todo')}
+            className={`flex items-center gap-2 mx-3 mt-2 px-3 py-2 rounded-lg text-sm transition-all ${
+              location.pathname === '/todo'
+                ? 'bg-surface-secondary text-content-primary'
+                : 'text-content-tertiary hover:bg-surface-secondary'
+            }`}
+          >
+            <ClipboardDocumentListIcon className="w-4 h-4" />
+            {t.todo}
+          </button>
+        )}
+
         {/* Tree content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {isLoading ? (
@@ -281,21 +296,6 @@ export default function Sidebar() {
             <SparklesIcon className="w-4 h-4" />
             {t.newNote}
           </button>
-
-          {/* Todo link (개인 공간만) */}
-          {activeTab === 'personal' && (
-            <button
-              onClick={() => navigate('/todo')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
-                location.pathname === '/todo'
-                  ? 'bg-surface-secondary text-content-primary'
-                  : 'text-content-tertiary hover:bg-surface-secondary'
-              }`}
-            >
-              <ClipboardDocumentListIcon className="w-4 h-4" />
-              {t.todo}
-            </button>
-          )}
 
           {/* Trash link */}
           <button
