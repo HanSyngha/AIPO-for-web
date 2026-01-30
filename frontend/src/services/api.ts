@@ -198,6 +198,9 @@ export const todosApi = {
 
   update: (todoId: string, data: { completed?: boolean; title?: string; startDate?: string; endDate?: string }) =>
     api.patch(`/todos/${todoId}`, data),
+
+  delete: (todoId: string) =>
+    api.delete(`/todos/${todoId}`),
 };
 
 // ==================== Settings API ====================

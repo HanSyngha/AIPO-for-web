@@ -92,6 +92,23 @@ export function getTodoToolDefinitions() {
     {
       type: 'function' as const,
       function: {
+        name: 'delete_todo',
+        description: '기존 Todo를 삭제합니다. 제목으로 매칭합니다.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description: '삭제할 Todo의 제목 (부분 일치 가능)',
+            },
+          },
+          required: ['title'],
+        },
+      },
+    },
+    {
+      type: 'function' as const,
+      function: {
         name: 'nothing_more_todo',
         description: '더 이상 추가/수정할 Todo가 없을 때 호출합니다. 모든 작업 완료 후 반드시 호출하세요.',
         parameters: {
@@ -104,14 +121,15 @@ export function getTodoToolDefinitions() {
 }
 
 /**
- * Todo 제목으로 미완료 Todo 검색 (대소문자 무시, 부분 일치)
+ * Todo 제목으로 검색 (대소문자 무시, 부분 일치)
+ * includeCompleted=true이면 완료된 Todo도 포함
  */
-async function findTodoByTitle(userId: string, spaceId: string, title: string) {
+async function findTodoByTitle(userId: string, spaceId: string, title: string, includeCompleted = false) {
   const todos = await prisma.todo.findMany({
     where: {
       userId,
       spaceId,
-      completed: false,
+      ...(includeCompleted ? {} : { completed: false }),
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -284,6 +302,33 @@ export async function executeTodoTool(
           success: true,
           message: `Todo updated: "${todo.title}" → ${(finalStart as Date).toISOString().split('T')[0]} ~ ${(finalEnd as Date).toISOString().split('T')[0]}`,
           data: { todoId: todo.id },
+        };
+      }
+
+      case 'delete_todo': {
+        const { title } = args;
+
+        if (!title || !title.trim()) {
+          return { success: false, message: 'Title is required' };
+        }
+
+        const todoToDelete = await findTodoByTitle(userId, spaceId, title.trim(), true);
+
+        if (!todoToDelete) {
+          return {
+            success: false,
+            message: `No matching todo found for: "${title.trim()}"`,
+          };
+        }
+
+        await prisma.todo.delete({
+          where: { id: todoToDelete.id },
+        });
+
+        return {
+          success: true,
+          message: `Todo deleted: "${todoToDelete.title}"`,
+          data: { todoId: todoToDelete.id },
         };
       }
 

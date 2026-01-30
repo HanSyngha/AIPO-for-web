@@ -224,3 +224,31 @@ todosRoutes.patch('/:id', async (req: AuthenticatedRequest, res) => {
     res.status(500).json({ error: 'Failed to update todo' });
   }
 });
+
+/**
+ * DELETE /todos/:id — Todo 삭제
+ */
+todosRoutes.delete('/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const todo = await prisma.todo.findUnique({ where: { id } });
+
+    if (!todo) {
+      res.status(404).json({ error: 'Todo not found' });
+      return;
+    }
+
+    if (todo.userId !== req.userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    await prisma.todo.delete({ where: { id } });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete todo error:', error);
+    res.status(500).json({ error: 'Failed to delete todo' });
+  }
+});

@@ -906,6 +906,7 @@ ${todoListStr}
 - add_todo(title, content?, startDate?, endDate?): 새 Todo 추가. 기본값: startDate=오늘, endDate=1년 후
 - complete_todo(title): 제목으로 기존 Todo를 완료 처리
 - update_todo(title, startDate?, endDate?): 제목으로 기존 Todo의 기간 수정
+- delete_todo(title): 제목으로 기존 Todo를 삭제
 - nothing_more_todo(): 더 이상 처리할 Todo가 없을 때 호출
 
 ## 규칙

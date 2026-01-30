@@ -10,6 +10,7 @@ import {
   PencilIcon,
   CheckIcon,
   XMarkIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolidIcon } from '@heroicons/react/24/solid';
 
@@ -26,6 +27,8 @@ const translations = {
     incomplete: '미완료',
     save: '저장',
     cancel: '취소',
+    delete: '삭제',
+    deleteConfirm: '이 Todo를 삭제하시겠습니까?',
   },
   en: {
     title: 'Todo',
@@ -39,6 +42,8 @@ const translations = {
     incomplete: 'Incomplete',
     save: 'Save',
     cancel: 'Cancel',
+    delete: 'Delete',
+    deleteConfirm: 'Delete this todo?',
   },
   cn: {
     title: '待办事项',
@@ -52,6 +57,8 @@ const translations = {
     incomplete: '未完成',
     save: '保存',
     cancel: '取消',
+    delete: '删除',
+    deleteConfirm: '确定删除此待办事项？',
   },
 };
 
@@ -273,6 +280,16 @@ export default function Todo() {
     }
   };
 
+  const handleDelete = async (todoId: string) => {
+    if (!window.confirm(t.deleteConfirm)) return;
+    try {
+      await todosApi.delete(todoId);
+      setTodos(prev => prev.filter(t => t.id !== todoId));
+    } catch (error) {
+      console.error('Failed to delete todo:', error);
+    }
+  };
+
   const handleGoToday = () => setCurrentDate(new Date());
   const handlePrev = () => setCurrentDate(prev => navigateDate(prev, view, -1));
   const handleNext = () => setCurrentDate(prev => navigateDate(prev, view, 1));
@@ -409,6 +426,7 @@ export default function Todo() {
                     onCancelEdit={() => setEditingId(null)}
                     onToggle={handleToggleComplete}
                     onUpdate={handleUpdate}
+                    onDelete={handleDelete}
                     t={t}
                   />
                 ))}
@@ -438,6 +456,7 @@ export default function Todo() {
                     onCancelEdit={() => setEditingId(null)}
                     onToggle={handleToggleComplete}
                     onUpdate={handleUpdate}
+                    onDelete={handleDelete}
                     t={t}
                   />
                 ))}
@@ -465,6 +484,7 @@ function GanttRow({
   onCancelEdit,
   onToggle,
   onUpdate,
+  onDelete,
   t,
 }: {
   todo: TodoItem;
@@ -479,6 +499,7 @@ function GanttRow({
   onCancelEdit: () => void;
   onToggle: (todo: TodoItem) => void;
   onUpdate: (id: string, data: { title?: string; startDate?: string; endDate?: string }) => void;
+  onDelete: (id: string) => void;
   t: Record<string, string>;
 }) {
   const [editTitle, setEditTitle] = useState(todo.title);
@@ -586,6 +607,12 @@ function GanttRow({
               className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-secondary transition-all text-content-quaternary hover:text-content-secondary"
             >
               <PencilIcon className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => onDelete(todo.id)}
+              className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-content-quaternary hover:text-red-500"
+            >
+              <TrashIcon className="w-3 h-3" />
             </button>
           </div>
         )}
