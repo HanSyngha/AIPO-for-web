@@ -29,7 +29,7 @@ export default function Modal({
   children,
   size = 'md',
   showClose = true,
-  closeOnOverlay = true,
+  closeOnOverlay = false,
 }: ModalProps) {
   return (
     <Transition appear show={isOpen} as={Fragment}>

@@ -171,12 +171,6 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
         setResult(data.result || null);
         setProgress(100);
         refresh(); // Refresh the tree
-
-        // 2회 요청마다 평가 팝업 표시
-        if (shouldShowRating()) {
-          setRatingModel((data as any).modelName || 'unknown');
-          setTimeout(() => setShowRating(true), 800);
-        }
       } else {
         setStatus('failed');
         setError(data.error || t.error);
@@ -254,6 +248,12 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
 
   const handleSubmit = async () => {
     if (!input.trim() || !spaceId) return;
+
+    // 입력 시점에 평가 팝업 표시 (2회마다)
+    if (shouldShowRating()) {
+      setRatingModel('once');
+      setShowRating(true);
+    }
 
     setStatus('submitting');
     setError(null);
@@ -570,7 +570,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
   return (
     <>
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={handleClose}>
+      <Dialog as="div" className="relative z-50" onClose={() => {}}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
