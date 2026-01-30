@@ -121,7 +121,7 @@ export default function Trash() {
     setIsLoading(true);
     try {
       const response = await trashApi.list(currentSpaceId);
-      setItems(response.data.items || []);
+      setItems(response.data.files || []);
     } catch (error) {
       console.error('Failed to load trash:', error);
     } finally {
