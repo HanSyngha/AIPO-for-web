@@ -152,7 +152,20 @@ export default function Note() {
     try {
       const response = await filesApi.share(fileId);
       const shareUrl = response.data.shareUrl;
-      await navigator.clipboard.writeText(shareUrl);
+
+      // HTTP 환경에서는 clipboard API가 없으므로 fallback 사용
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = shareUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
       showToast.success(t.shareSuccess);
     } catch (err) {
       console.error('Share failed:', err);

@@ -199,7 +199,7 @@ commentsRoutes.post('/files/:fileId/comments', async (req: AuthenticatedRequest,
     const { fileId } = req.params;
     const { blockId, content, parentId } = req.body;
 
-    if (!blockId || !content) {
+    if (typeof blockId !== 'string' || !content) {
       res.status(400).json({ error: 'blockId and content are required' });
       return;
     }
