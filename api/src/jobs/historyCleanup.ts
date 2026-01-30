@@ -132,22 +132,7 @@ export async function runHistoryCleanupJob(): Promise<void> {
     // 2. 만료된 히스토리 삭제
     const deletedCount = await cleanupExpiredHistories();
 
-    // 3. 감사 로그 (시스템 작업)
-    await prisma.auditLog.create({
-      data: {
-        userId: 'system',
-        action: 'PERMANENT_DELETE',
-        targetType: 'HISTORY',
-        targetId: 'batch',
-        details: {
-          job: 'history_cleanup',
-          deletedCount,
-          timestamp: new Date().toISOString(),
-        },
-      },
-    });
-
-    console.log('[HistoryCleanup] Job completed successfully.');
+    console.log(`[HistoryCleanup] Job completed successfully. Deleted ${deletedCount} expired histories.`);
   } catch (error) {
     console.error('[HistoryCleanup] Job failed:', error);
     throw error;
