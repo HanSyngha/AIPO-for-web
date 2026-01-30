@@ -11,6 +11,8 @@ import { inputRateLimiter, searchRateLimiter } from '../middleware/rateLimit.js'
 import { addToQueue, getQueuePosition, cancelRequest } from '../services/queue/bull.service.js';
 import { resolveUserAnswer } from '../services/llm/agent.service.js';
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://a2g.samsungds.net:16001';
+
 export const requestsRoutes = Router();
 export const quickAddRoutes = Router();
 
@@ -305,6 +307,48 @@ requestsRoutes.post('/refactor', async (req: AuthenticatedRequest, res) => {
 });
 
 /**
+ * GET /requests/queue-status
+ * 큐 전체 상태 조회
+ * NOTE: 이 라우트는 반드시 GET /:id 보다 먼저 선언해야 함 (Express 라우트 매칭 순서)
+ */
+requestsRoutes.get('/queue-status', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { spaceId } = req.query;
+
+    if (!spaceId) {
+      res.status(400).json({ error: 'spaceId is required' });
+      return;
+    }
+
+    const canAccess = await canAccessSpace(req.userId!, req.user!.loginid, spaceId as string);
+    if (!canAccess) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // 대기 중 & 처리 중 요청 조회
+    const pending = await prisma.request.count({
+      where: { spaceId: spaceId as string, status: 'PENDING' },
+    });
+
+    const processing = await prisma.request.count({
+      where: { spaceId: spaceId as string, status: 'PROCESSING' },
+    });
+
+    res.json({
+      queue: {
+        pending,
+        processing,
+        total: pending + processing,
+      },
+    });
+  } catch (error) {
+    console.error('Get queue status error:', error);
+    res.status(500).json({ error: 'Failed to get queue status' });
+  }
+});
+
+/**
  * GET /requests/:id
  * 요청 상태 조회
  */
@@ -455,47 +499,6 @@ requestsRoutes.delete('/:id', async (req: AuthenticatedRequest, res) => {
 });
 
 /**
- * GET /requests/queue-status
- * 큐 전체 상태 조회
- */
-requestsRoutes.get('/queue-status', async (req: AuthenticatedRequest, res) => {
-  try {
-    const { spaceId } = req.query;
-
-    if (!spaceId) {
-      res.status(400).json({ error: 'spaceId is required' });
-      return;
-    }
-
-    const canAccess = await canAccessSpace(req.userId!, req.user!.loginid, spaceId as string);
-    if (!canAccess) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
-    // 대기 중 & 처리 중 요청 조회
-    const pending = await prisma.request.count({
-      where: { spaceId: spaceId as string, status: 'PENDING' },
-    });
-
-    const processing = await prisma.request.count({
-      where: { spaceId: spaceId as string, status: 'PROCESSING' },
-    });
-
-    res.json({
-      queue: {
-        pending,
-        processing,
-        total: pending + processing,
-      },
-    });
-  } catch (error) {
-    console.error('Get queue status error:', error);
-    res.status(500).json({ error: 'Failed to get queue status' });
-  }
-});
-
-/**
  * @swagger
  * /quick-add:
  *   post:
@@ -554,7 +557,7 @@ quickAddRoutes.post('/', async (req, res) => {
     });
 
     if (!user || !user.personalSpace) {
-      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
+      res.status(404).json({ error: `User not found. Please sign up first at ${FRONTEND_URL}`, signupUrl: FRONTEND_URL });
       return;
     }
 
@@ -603,7 +606,7 @@ quickAddRoutes.post('/', async (req, res) => {
         createdAt: request.createdAt,
       },
       message: '입력이 접수되었습니다. 잠시 후 AI가 정리해드립니다.',
-      url: 'http://a2g.samsungds.net:16001',
+      url: FRONTEND_URL,
     });
   } catch (error) {
     console.error('Quick add error:', error);
@@ -675,7 +678,7 @@ quickAddRoutes.post('/todo', async (req, res) => {
     });
 
     if (!user || !user.personalSpace) {
-      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
+      res.status(404).json({ error: `User not found. Please sign up first at ${FRONTEND_URL}`, signupUrl: FRONTEND_URL });
       return;
     }
 
@@ -771,7 +774,7 @@ quickAddRoutes.get('/search', async (req, res) => {
     });
 
     if (!user || !user.personalSpace) {
-      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
+      res.status(404).json({ error: `User not found. Please sign up first at ${FRONTEND_URL}`, signupUrl: FRONTEND_URL });
       return;
     }
 
@@ -858,7 +861,7 @@ quickAddRoutes.get('/todos', async (req, res) => {
     });
 
     if (!user || !user.personalSpace) {
-      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
+      res.status(404).json({ error: `User not found. Please sign up first at ${FRONTEND_URL}`, signupUrl: FRONTEND_URL });
       return;
     }
 
@@ -963,7 +966,7 @@ quickAddRoutes.patch('/todos', async (req, res) => {
     });
 
     if (!user) {
-      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
+      res.status(404).json({ error: `User not found. Please sign up first at ${FRONTEND_URL}`, signupUrl: FRONTEND_URL });
       return;
     }
 

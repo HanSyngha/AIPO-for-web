@@ -26,6 +26,10 @@ const translations = {
     empty: '아직 댓글이 없습니다',
     emptyDesc: '첫 번째 댓글을 남겨보세요',
     deleteConfirm: '정말 삭제하시겠습니까?',
+    replyingTo: '답글 대상:',
+    postError: '댓글 등록에 실패했습니다',
+    updateError: '댓글 수정에 실패했습니다',
+    deleteError: '댓글 삭제에 실패했습니다',
   },
   en: {
     title: 'Comments',
@@ -39,6 +43,10 @@ const translations = {
     empty: 'No comments yet',
     emptyDesc: 'Be the first to comment',
     deleteConfirm: 'Are you sure you want to delete?',
+    replyingTo: 'Replying to',
+    postError: 'Failed to post comment',
+    updateError: 'Failed to update comment',
+    deleteError: 'Failed to delete comment',
   },
   cn: {
     title: '评论',
@@ -52,6 +60,10 @@ const translations = {
     empty: '暂无评论',
     emptyDesc: '成为第一个评论者',
     deleteConfirm: '确定要删除吗？',
+    replyingTo: '回复给',
+    postError: '评论发布失败',
+    updateError: '评论修改失败',
+    deleteError: '评论删除失败',
   },
 };
 
@@ -120,7 +132,7 @@ export default function CommentThread({ fileId, blockId }: CommentThreadProps) {
       loadComments();
     } catch (error) {
       console.error('Failed to create comment:', error);
-      showToast.error('Failed to post comment');
+      showToast.error(t.postError);
     } finally {
       setIsSubmitting(false);
     }
@@ -136,7 +148,7 @@ export default function CommentThread({ fileId, blockId }: CommentThreadProps) {
       loadComments();
     } catch (error) {
       console.error('Failed to update comment:', error);
-      showToast.error('Failed to update comment');
+      showToast.error(t.updateError);
     }
   };
 
@@ -148,7 +160,7 @@ export default function CommentThread({ fileId, blockId }: CommentThreadProps) {
       loadComments();
     } catch (error) {
       console.error('Failed to delete comment:', error);
-      showToast.error('Failed to delete comment');
+      showToast.error(t.deleteError);
     }
   };
 
@@ -332,8 +344,8 @@ export default function CommentThread({ fileId, blockId }: CommentThreadProps) {
         {replyTo && (
           <div className="flex items-center justify-between mb-2 text-xs text-content-tertiary bg-surface-secondary rounded-lg px-3 py-2">
             <span>
-              Replying to{' '}
-              {comments.find((c) => c.id === replyTo)?.user.username || 'comment'}
+              {t.replyingTo}{' '}
+              {comments.find((c) => c.id === replyTo)?.user.username || ''}
             </span>
             <button
               onClick={() => setReplyTo(null)}

@@ -36,6 +36,8 @@ const translations = {
     exportSuccess: '파일이 다운로드되었습니다',
     retryTranslation: '번역 재시도',
     translating: '번역 중...',
+    shareError: '공유 링크 생성에 실패했습니다',
+    exportError: '내보내기에 실패했습니다',
   },
   en: {
     back: 'Back',
@@ -53,6 +55,8 @@ const translations = {
     exportSuccess: 'File downloaded',
     retryTranslation: 'Retry translation',
     translating: 'Translating...',
+    shareError: 'Failed to create share link',
+    exportError: 'Export failed',
   },
   cn: {
     back: '返回',
@@ -70,6 +74,8 @@ const translations = {
     exportSuccess: '文件已下载',
     retryTranslation: '重试翻译',
     translating: '翻译中...',
+    shareError: '创建共享链接失败',
+    exportError: '导出失败',
   },
 };
 
@@ -169,7 +175,7 @@ export default function Note() {
       showToast.success(t.shareSuccess);
     } catch (err) {
       console.error('Share failed:', err);
-      showToast.error('공유 링크 생성에 실패했습니다');
+      showToast.error(t.shareError);
     }
   };
 
@@ -195,6 +201,7 @@ export default function Note() {
       showToast.success(t.exportSuccess);
     } catch (err) {
       console.error('Export failed:', err);
+      showToast.error(t.exportError);
     } finally {
       setIsExporting(false);
     }

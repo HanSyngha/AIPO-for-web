@@ -12,7 +12,6 @@ import {
   ArrowPathIcon,
   ExclamationTriangleIcon,
   DocumentTextIcon,
-  FolderIcon,
   ClockIcon,
   CheckIcon,
 } from '@heroicons/react/24/outline';
@@ -87,7 +86,6 @@ interface TrashItem {
   id: string;
   name: string;
   path: string;
-  type: 'file' | 'folder';
   deletedAt: string;
   expiresAt: string;
 }
@@ -361,18 +359,8 @@ export default function Trash() {
                   {isSelected && <CheckIcon className="w-3 h-3" />}
                 </button>
 
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    item.type === 'folder'
-                      ? 'bg-amber-100 dark:bg-amber-900/30'
-                      : 'bg-blue-100 dark:bg-blue-900/30'
-                  }`}
-                >
-                  {item.type === 'folder' ? (
-                    <FolderIcon className="w-5 h-5 text-amber-500" />
-                  ) : (
-                    <DocumentTextIcon className="w-5 h-5 text-blue-500" />
-                  )}
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-blue-100 dark:bg-blue-900/30">
+                  <DocumentTextIcon className="w-5 h-5 text-blue-500" />
                 </div>
 
                 <div className="flex-1 min-w-0">
