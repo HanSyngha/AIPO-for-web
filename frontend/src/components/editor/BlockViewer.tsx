@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
@@ -8,9 +8,49 @@ interface BlockViewerProps {
   className?: string;
 }
 
+/**
+ * content를 BlockNote가 파싱 가능한 형태로 정제
+ * LLM이 잘못된 블록을 생성할 수 있으므로 방어적으로 처리
+ */
+function sanitizeContent(content: any): any[] | undefined {
+  if (!content) return undefined;
+
+  // 문자열이면 JSON 파싱 시도
+  if (typeof content === 'string') {
+    try {
+      content = JSON.parse(content);
+    } catch {
+      // 일반 텍스트 → paragraph 블록으로 변환
+      return [{ type: 'paragraph', content: [{ type: 'text', text: content }] }];
+    }
+  }
+
+  // 배열이 아니면 감싸기
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
+  // 빈 배열이면 기본 블록
+  if (content.length === 0) {
+    return undefined;
+  }
+
+  // 각 블록이 최소 type 필드를 갖도록 필터
+  return content.filter(
+    (block: any) => block && typeof block === 'object' && typeof block.type === 'string'
+  );
+}
+
 export default function BlockViewer({ content, className = '' }: BlockViewerProps) {
+  const [error, setError] = useState(false);
+
+  const safeContent = useMemo(() => sanitizeContent(content), [content]);
+
+  // 에러 발생 시 fallback 콘텐츠로 에디터 생성
   const editor = useCreateBlockNote({
-    initialContent: content,
+    initialContent: error
+      ? [{ type: 'paragraph' as const, content: [{ type: 'text' as const, text: '콘텐츠를 표시할 수 없습니다.' }] }]
+      : safeContent,
   });
 
   // Make editor read-only
@@ -22,14 +62,15 @@ export default function BlockViewer({ content, className = '' }: BlockViewerProp
 
   // Update content when it changes
   useEffect(() => {
-    if (editor && content) {
+    if (editor && safeContent && !error) {
       try {
-        editor.replaceBlocks(editor.document, content);
+        editor.replaceBlocks(editor.document, safeContent);
       } catch (e) {
         console.error('Failed to update BlockNote content:', e);
+        setError(true);
       }
     }
-  }, [editor, content]);
+  }, [editor, safeContent, error]);
 
   return (
     <div className={`blocknote-viewer ${className}`}>
