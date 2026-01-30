@@ -49,7 +49,8 @@ curl -X POST http://a2g.samsungds.net:16001/api/quick-add \
     "position": 1,
     "createdAt": "2026-01-30T04:00:00.000Z"
   },
-  "message": "입력이 접수되었습니다. 잠시 후 AI가 정리해드립니다."
+  "message": "입력이 접수되었습니다. 잠시 후 AI가 정리해드립니다.",
+  "url": "http://a2g.samsungds.net:16001"
 }
 ```
 
@@ -244,8 +245,17 @@ curl -X PATCH http://a2g.samsungds.net:16001/api/quick-add/todos \
 |--------|------|
 | 400 | 필수 파라미터 누락 또는 유효하지 않은 값 |
 | 403 | 권한 없음 (다른 사용자의 Todo 수정 시도 등) |
-| 404 | 사용자, 공간, 또는 Todo를 찾을 수 없음 |
+| 404 | 사용자를 찾을 수 없음 (미가입 시 가입 안내 + URL 반환) |
 | 500 | 서버 에러 |
+
+**404 응답 예시 (미가입자)**
+
+```json
+{
+  "error": "User not found. Please sign up first at http://a2g.samsungds.net:16001",
+  "signupUrl": "http://a2g.samsungds.net:16001"
+}
+```
 
 ---
 

@@ -554,7 +554,7 @@ quickAddRoutes.post('/', async (req, res) => {
     });
 
     if (!user || !user.personalSpace) {
-      res.status(404).json({ error: 'User or personal space not found' });
+      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
       return;
     }
 
@@ -603,6 +603,7 @@ quickAddRoutes.post('/', async (req, res) => {
         createdAt: request.createdAt,
       },
       message: '입력이 접수되었습니다. 잠시 후 AI가 정리해드립니다.',
+      url: 'http://a2g.samsungds.net:16001',
     });
   } catch (error) {
     console.error('Quick add error:', error);
@@ -674,7 +675,7 @@ quickAddRoutes.post('/todo', async (req, res) => {
     });
 
     if (!user || !user.personalSpace) {
-      res.status(404).json({ error: 'User or personal space not found' });
+      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
       return;
     }
 
@@ -770,7 +771,7 @@ quickAddRoutes.get('/search', async (req, res) => {
     });
 
     if (!user || !user.personalSpace) {
-      res.status(404).json({ error: 'User or personal space not found' });
+      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
       return;
     }
 
@@ -857,7 +858,7 @@ quickAddRoutes.get('/todos', async (req, res) => {
     });
 
     if (!user || !user.personalSpace) {
-      res.status(404).json({ error: 'User or personal space not found' });
+      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
       return;
     }
 
@@ -962,7 +963,7 @@ quickAddRoutes.patch('/todos', async (req, res) => {
     });
 
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found. Please sign up first at http://a2g.samsungds.net:16001', signupUrl: 'http://a2g.samsungds.net:16001' });
       return;
     }
 
