@@ -150,7 +150,7 @@ export default function Search() {
       const response = await requestsApi.search(spaceId, q.trim());
       setResults(response.data.results || []);
 
-      // 2회 요청마다 평가 팝업 표시
+      // 20회 요청마다 평가 팝업 표시
       if (shouldShowRating()) {
         setTimeout(() => setShowRating(true), 600);
       }

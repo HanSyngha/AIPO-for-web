@@ -249,7 +249,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
   const handleSubmit = async () => {
     if (!input.trim() || !spaceId) return;
 
-    // 입력 시점에 평가 팝업 표시 (2회마다)
+    // 입력 시점에 평가 팝업 표시 (20회마다)
     if (shouldShowRating()) {
       setRatingModel('once');
       setShowRating(true);

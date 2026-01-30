@@ -44,7 +44,7 @@ interface RatingPopupProps {
 const RATING_INTERVAL = 20;
 const STORAGE_KEY = 'once_request_count';
 
-/** 요청 횟수 추적. 2회마다 true 반환 */
+/** 요청 횟수 추적. 20회마다 true 반환 */
 export function shouldShowRating(): boolean {
   const count = Number(localStorage.getItem(STORAGE_KEY) || '0') + 1;
   localStorage.setItem(STORAGE_KEY, String(count));
