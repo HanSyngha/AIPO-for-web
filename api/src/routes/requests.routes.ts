@@ -609,3 +609,116 @@ quickAddRoutes.post('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to process quick add request' });
   }
 });
+
+/**
+ * @swagger
+ * /quick-add/todo:
+ *   post:
+ *     summary: Todo 직접 추가 (개인 공간)
+ *     description: |
+ *       loginid로 사용자를 식별하여 개인 공간에 Todo를 추가합니다.
+ *       인증 없이 사용 가능합니다.
+ *     tags: [Quick Add]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id
+ *               - title
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: 사용자 loginid
+ *               title:
+ *                 type: string
+ *                 description: Todo 제목
+ *               content:
+ *                 type: string
+ *                 description: 상세 내용 (선택)
+ *               startDate:
+ *                 type: string
+ *                 description: 시작일 YYYY-MM-DD (선택, 기본 오늘)
+ *               endDate:
+ *                 type: string
+ *                 description: 종료일 YYYY-MM-DD (선택, 기본 1년 후)
+ *           example:
+ *             id: "hong.gildong"
+ *             title: "보고서 제출"
+ *             endDate: "2026-02-28"
+ *     responses:
+ *       201:
+ *         description: Todo 생성 성공
+ *       400:
+ *         description: 잘못된 요청
+ *       404:
+ *         description: 사용자를 찾을 수 없음
+ */
+quickAddRoutes.post('/todo', async (req, res) => {
+  try {
+    const { id, title, content, startDate, endDate } = req.body;
+
+    if (!id || !title) {
+      res.status(400).json({ error: 'id and title are required' });
+      return;
+    }
+
+    // loginid로 사용자 조회
+    const user = await prisma.user.findUnique({
+      where: { loginid: id },
+      include: {
+        personalSpace: { select: { id: true } },
+      },
+    });
+
+    if (!user || !user.personalSpace) {
+      res.status(404).json({ error: 'User or personal space not found' });
+      return;
+    }
+
+    const now = new Date();
+    const oneYearLater = new Date();
+    oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+
+    const parsedStart = startDate ? new Date(startDate) : now;
+    const parsedEnd = endDate ? new Date(endDate) : oneYearLater;
+
+    if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+      res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+      return;
+    }
+
+    if (parsedEnd < parsedStart) {
+      res.status(400).json({ error: 'endDate must be after startDate' });
+      return;
+    }
+
+    const todo = await prisma.todo.create({
+      data: {
+        userId: user.id,
+        spaceId: user.personalSpace.id,
+        title: title.trim(),
+        content: content?.trim() || null,
+        startDate: parsedStart,
+        endDate: parsedEnd,
+      },
+    });
+
+    res.status(201).json({
+      todo: {
+        id: todo.id,
+        title: todo.title,
+        startDate: todo.startDate,
+        endDate: todo.endDate,
+        completed: todo.completed,
+        createdAt: todo.createdAt,
+      },
+      message: 'Todo가 추가되었습니다.',
+    });
+  } catch (error) {
+    console.error('Quick add todo error:', error);
+    res.status(500).json({ error: 'Failed to create todo' });
+  }
+});

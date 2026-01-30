@@ -51,8 +51,8 @@ function FolderNode({ node, level }: FolderNodeProps) {
   const hasChildren = node.children && node.children.length > 0;
   const paddingLeft = 12 + level * 16;
 
-  // 폴더 삭제 권한: 개인 공간은 본인, 팀 공간은 Super Admin만
-  const canDeleteFolder = activeTab === 'personal' || user?.isSuperAdmin;
+  // 폴더 삭제 권한: 개인 공간은 본인, 팀 공간은 Super Admin 또는 Team Admin
+  const canDeleteFolder = activeTab === 'personal' || user?.isSuperAdmin || user?.isTeamAdmin;
 
   const openMenu = (anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect();

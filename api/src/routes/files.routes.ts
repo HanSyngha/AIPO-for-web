@@ -505,7 +505,7 @@ filesRoutes.post('/:id/trash', async (req: AuthenticatedRequest, res) => {
  * DELETE /folders/:id
  * 폴더 삭제 (하위 파일은 휴지통으로, 하위 폴더는 재귀 삭제)
  * - 개인 공간: 본인만
- * - 팀 공간: Super Admin만
+ * - 팀 공간: Super Admin 또는 Team Admin
  */
 filesRoutes.delete('/folders/:id', async (req: AuthenticatedRequest, res) => {
   try {
@@ -515,7 +515,16 @@ filesRoutes.delete('/folders/:id', async (req: AuthenticatedRequest, res) => {
       where: { id },
       include: {
         space: {
-          select: { id: true, userId: true, teamId: true },
+          select: {
+            id: true,
+            userId: true,
+            teamId: true,
+            team: {
+              select: {
+                admins: { select: { userId: true } },
+              },
+            },
+          },
         },
       },
     });
@@ -535,9 +544,10 @@ filesRoutes.delete('/folders/:id', async (req: AuthenticatedRequest, res) => {
         return;
       }
     } else {
-      // 팀 공간: Super Admin만 삭제 가능
-      if (!superAdmin) {
-        res.status(403).json({ error: 'Only super admin can delete team folders' });
+      // 팀 공간: Super Admin 또는 Team Admin만 삭제 가능
+      const isTeamAdmin = folder.space.team?.admins.some(a => a.userId === req.userId) ?? false;
+      if (!superAdmin && !isTeamAdmin) {
+        res.status(403).json({ error: 'Only admin can delete team folders' });
         return;
       }
     }
