@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useSpaceStore } from '../../stores/spaceStore';
-import { requestsApi } from '../../services/api';
+import { requestsApi, adminApi } from '../../services/api';
 import RatingPopup, { shouldShowRating } from '../common/RatingPopup';
 import {
   subscribeToRequest,
@@ -304,7 +304,11 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
 
     // 입력 시점에 평가 팝업 표시 (20회마다)
     if (shouldShowRating()) {
-      setRatingModel('once');
+      adminApi.getModelConfig().then((res) => {
+        setRatingModel(res.data.defaultModel || 'unknown');
+      }).catch(() => {
+        setRatingModel('unknown');
+      });
       setShowRating(true);
     }
 

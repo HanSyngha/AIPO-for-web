@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 
 import { useSettingsStore } from '../stores/settingsStore';
-import { requestsApi } from '../services/api';
+import { requestsApi, adminApi } from '../services/api';
 import { showToast } from '../components/common/Toast';
 import RatingPopup, { shouldShowRating } from '../components/common/RatingPopup';
 import EmptyState from '../components/common/EmptyState';
@@ -99,6 +99,7 @@ export default function Search() {
   const [spaceFilter, setSpaceFilter] = useState<'all' | 'personal' | 'team'>('all');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showRating, setShowRating] = useState(false);
+  const [ratingModel, setRatingModel] = useState('unknown');
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
 
@@ -141,6 +142,11 @@ export default function Search() {
               setResults([]);
             }
             if (shouldShowRating()) {
+              adminApi.getModelConfig().then((res) => {
+                setRatingModel(res.data.defaultModel || 'unknown');
+              }).catch(() => {
+                setRatingModel('unknown');
+              });
               setTimeout(() => setShowRating(true), 600);
             }
             return false;
@@ -204,6 +210,11 @@ export default function Search() {
 
       // Rating popup
       if (shouldShowRating()) {
+        adminApi.getModelConfig().then((res) => {
+          setRatingModel(res.data.defaultModel || 'unknown');
+        }).catch(() => {
+          setRatingModel('unknown');
+        });
         setTimeout(() => setShowRating(true), 600);
       }
     };
@@ -472,7 +483,7 @@ export default function Search() {
     <RatingPopup
       isOpen={showRating}
       onClose={() => setShowRating(false)}
-      modelName="unknown"
+      modelName={ratingModel}
     />
     </>
   );

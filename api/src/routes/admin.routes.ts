@@ -607,7 +607,7 @@ adminRoutes.get('/models', requireSuperAdmin, async (req: AuthenticatedRequest, 
  * GET /admin/model-config
  * 현재 모델 설정 조회 (default model + fallback models)
  */
-adminRoutes.get('/model-config', requireTeamAdminOrHigher, async (_req: AuthenticatedRequest, res) => {
+adminRoutes.get('/model-config', async (_req: AuthenticatedRequest, res) => {
   try {
     const configStr = await redis.get(MODEL_CONFIG_KEY);
     if (!configStr) {
