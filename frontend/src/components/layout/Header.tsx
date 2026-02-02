@@ -66,6 +66,9 @@ export default function Header() {
   const [showSearch, setShowSearch] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() =>
+    new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+  );
 
   const searchRef = useRef<HTMLDivElement>(null);
   const themeRef = useRef<HTMLDivElement>(null);
@@ -86,6 +89,26 @@ export default function Header() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Real-time clock (KST, updates every minute)
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval>;
+    const updateClock = () => {
+      setCurrentTime(
+        new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+      );
+    };
+    const now = new Date();
+    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    const timeoutId = setTimeout(() => {
+      updateClock();
+      intervalId = setInterval(updateClock, 60000);
+    }, msUntilNextMinute);
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
   // Global keyboard shortcut: Cmd/Ctrl + K to open search
@@ -188,6 +211,11 @@ export default function Header() {
 
         {/* Right section */}
         <div className="flex items-center gap-2">
+          {/* Clock (KST) */}
+          <span className="hidden sm:block text-xs text-content-tertiary font-mono tabular-nums whitespace-nowrap">
+            {currentTime}
+          </span>
+
           {/* Theme toggle */}
           <div ref={themeRef} className="relative">
             <button

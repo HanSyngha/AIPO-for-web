@@ -10,7 +10,7 @@ import { Redis } from 'ioredis';
  * 활성 사용자 추적
  */
 export async function trackActiveUser(redis: Redis, loginid: string): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
   const key = `active_users:${today}`;
 
   await redis.sadd(key, loginid);
@@ -21,7 +21,7 @@ export async function trackActiveUser(redis: Redis, loginid: string): Promise<vo
  * 오늘 활성 사용자 수 조회
  */
 export async function getActiveUserCount(redis: Redis, date?: string): Promise<number> {
-  const targetDate = date || new Date().toISOString().split('T')[0];
+  const targetDate = date || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
   const key = `active_users:${targetDate}`;
 
   return redis.scard(key);

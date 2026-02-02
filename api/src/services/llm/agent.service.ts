@@ -804,7 +804,7 @@ export async function runTodoAgentLoop(
     take: 200,
   });
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
 
   const todoListStr = currentTodos.length > 0
     ? currentTodos.map(t => {
