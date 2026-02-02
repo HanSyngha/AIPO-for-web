@@ -105,6 +105,64 @@ export default function Search() {
   const personalSpaceId = user?.spaces?.personalSpaceId;
   const teamSpaceId = user?.spaces?.teamSpaceId;
   const currentRequestId = useRef<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  // Polling fallback — WebSocket 이벤트를 놓칠 경우 대비
+  const startPolling = (requestId: string) => {
+    stopPolling();
+    pollingRef.current = setInterval(async () => {
+      if (currentRequestId.current !== requestId) {
+        stopPolling();
+        return;
+      }
+      try {
+        const res = await requestsApi.get(requestId);
+        const req = res.data.request;
+        if (req.status === 'COMPLETED') {
+          stopPolling();
+          setIsSearching((prev) => {
+            if (!prev) return false; // 이미 WebSocket으로 처리됨
+            setProgress(100);
+            if (req.result) {
+              try {
+                const parsed = typeof req.result === 'string' ? JSON.parse(req.result) : req.result;
+                setResults(parsed.results || []);
+              } catch {
+                setResults([]);
+              }
+            } else {
+              setResults([]);
+            }
+            if (shouldShowRating()) {
+              setTimeout(() => setShowRating(true), 600);
+            }
+            return false;
+          });
+        } else if (req.status === 'FAILED') {
+          stopPolling();
+          setIsSearching((prev) => {
+            if (!prev) return false;
+            showToast.error(t.searchFailed);
+            setResults([]);
+            return false;
+          });
+        }
+      } catch {
+        // 폴링 에러는 무시 — 다음 interval에서 재시도
+      }
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem('once_recent_searches');
@@ -130,6 +188,7 @@ export default function Search() {
     const handleComplete = (data: RequestComplete) => {
       if (data.requestId !== currentRequestId.current) return;
 
+      stopPolling();
       setIsSearching(false);
       setProgress(100);
 
@@ -152,6 +211,7 @@ export default function Search() {
     const handleFailed = (data: { requestId: string; error: string }) => {
       if (data.requestId !== currentRequestId.current) return;
 
+      stopPolling();
       setIsSearching(false);
       setProgress(0);
       showToast.error(t.searchFailed);
@@ -216,19 +276,7 @@ export default function Search() {
       if (requestId) {
         currentRequestId.current = requestId;
         subscribeToRequest(requestId);
-
-        // Safety timeout — if WebSocket never responds, stop loading after 2 min
-        setTimeout(() => {
-          if (currentRequestId.current === requestId) {
-            setIsSearching((prev) => {
-              if (prev) {
-                setResults([]);
-                showToast.error(t.searchFailed);
-              }
-              return false;
-            });
-          }
-        }, 120_000);
+        startPolling(requestId);
       } else {
         // No requestId returned — unexpected
         setIsSearching(false);

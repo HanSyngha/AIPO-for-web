@@ -130,6 +130,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
   const [customAnswer, setCustomAnswer] = useState('');
   const [askDeadline, setAskDeadline] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>('');
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (isOpen && textareaRef.current) {
@@ -137,8 +138,57 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
     }
   }, [isOpen]);
 
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  const startPolling = (rid: string) => {
+    stopPolling();
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await requestsApi.get(rid);
+        const req = res.data.request;
+        if (req.status === 'COMPLETED') {
+          stopPolling();
+          setStatus((prev) => {
+            if (prev === 'completed' || prev === 'failed') return prev; // 이미 처리됨
+            if (req.result) {
+              try {
+                const parsed = typeof req.result === 'string' ? JSON.parse(req.result) : req.result;
+                setResult(parsed);
+              } catch {
+                setResult(null);
+              }
+            }
+            setProgress(100);
+            refresh();
+            return 'completed';
+          });
+        } else if (req.status === 'FAILED') {
+          stopPolling();
+          setStatus((prev) => {
+            if (prev === 'completed' || prev === 'failed') return prev;
+            setError(req.error || t.error);
+            return 'failed';
+          });
+        }
+      } catch {
+        // 폴링 에러는 무시
+      }
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
+
   useEffect(() => {
     if (!requestId) return;
+
+    startPolling(requestId);
 
     const handleQueueUpdate = (data: QueueUpdate) => {
       if (data.requestId !== requestId) return;
@@ -166,6 +216,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
     const handleComplete = (data: RequestComplete) => {
       if (data.requestId !== requestId) return;
 
+      stopPolling();
       if (data.success) {
         setStatus('completed');
         setResult(data.result || null);
@@ -179,6 +230,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
 
     const handleFailed = (data: { requestId: string; error: string }) => {
       if (data.requestId !== requestId) return;
+      stopPolling();
       setStatus('failed');
       setError(data.error || t.error);
       setAskUserData(null);
@@ -201,6 +253,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
     on('request:ask_user', handleAskUser);
 
     return () => {
+      stopPolling();
       off('queue:update', handleQueueUpdate);
       off('request:progress', handleProgress);
       off('request:complete', handleComplete);
@@ -272,6 +325,7 @@ export default function InputModal({ isOpen, onClose, spaceId }: InputModalProps
   };
 
   const handleReset = () => {
+    stopPolling();
     setStatus('idle');
     setRequestId(null);
     setQueuePosition(null);
