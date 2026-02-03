@@ -172,11 +172,11 @@ function getSystemPrompt(type: 'INPUT' | 'SEARCH' | 'REFACTOR', treeStructure: s
   const basePrompt = `당신은 ONCE의 AI 어시스턴트입니다.
 사용자의 입력을 분석하여 노트를 자동으로 정리하고 저장합니다.
 
-## 루트 폴더 구조 (최상위만 표시)
+## 전체 파일 트리 구조
 ${treeStructure || '(빈 공간)'}
 
-위는 루트 경로("/")의 직계 자식만 보여줍니다.
-하위 내용을 보려면 반드시 list_folder(path)를 사용하세요.
+위는 전체 폴더/파일 구조입니다. 📁는 폴더, 📄는 파일이며, 옆의 [경로]는 모든 도구에서 사용할 전체 경로입니다.
+**이 트리를 먼저 확인하고, 필요한 파일만 read_file로 내용을 확인하세요.**
 
 ## 폴더 계층 구조 원칙
 
@@ -206,8 +206,8 @@ ${isPersonalSpace ? '\n### 개인 공간 폴더 깊이 제한\n이 공간은 **�
     return basePrompt + `
 ## 사용 가능한 도구
 
-### 탐색
-- list_folder(path): 해당 폴더의 직계 자식(폴더+파일)만 조회. "/" = 루트.
+### 탐색 (트리에서 확인 후 필요시에만 사용)
+- list_folder(path): 트리에 없는 최신 정보가 필요할 때만 사용. 대부분의 경우 위 트리로 충분합니다.
 
 ### 폴더 관련
 - add_folder(path): 새 폴더 생성 (예: /프로젝트/ONCE)
@@ -236,13 +236,12 @@ ${isPersonalSpace ? '\n### 개인 공간 폴더 깊이 제한\n이 공간은 **�
 
 ## 작업 절차 (반드시 따르세요 — update 우선 원칙)
 1. 사용자 입력을 분석하여 주제/카테고리를 파악하세요.
-2. **반드시 list_folder("/")로 루트를 먼저 확인하세요.** 폴더 구조를 확인하지 않고 바로 파일을 생성하면 안 됩니다.
-3. 관련 있어 보이는 폴더가 있으면 list_folder로 한 단계씩 들어가며 **기존 파일이 있는지 철저히 탐색**하세요.
-4. **기존 파일 확인 (가장 중요)**: 같은 주제/카테고리의 파일이 존재하면 read_file로 내용을 읽고, edit_file로 새 내용을 추가/보완하세요. 이것이 최우선입니다.
-5. **기존 파일이 없을 때만** 새 폴더/파일을 생성하세요. 적절한 폴더가 없으면 새 폴더 구조를 만든 후 add_file로 파일을 생성하세요.
-6. **구조 정리**: 파일을 추가/수정한 후, 주변 폴더/파일명이 새 내용과 어울리지 않으면 edit_folder_name, edit_file_name, move_file로 조정하세요. 단, 기존 내용은 절대 유실하지 마세요.
-7. **완료 전 점검**: add_file 또는 edit_file을 최소 1회 이상 호출했는지 확인하세요. 하지 않았다면 반드시 파일을 생성/수정한 후 complete()를 호출하세요.
-8. 한국어로 노트를 작성하세요.
+2. **위 전체 트리를 먼저 확인하세요.** 트리에서 관련 폴더/파일 경로를 직접 찾을 수 있습니다. list_folder를 호출할 필요가 없습니다.
+3. **기존 파일 확인 (가장 중요)**: 트리에서 같은 주제/카테고리의 파일이 보이면 read_file로 내용을 읽고, edit_file로 새 내용을 추가/보완하세요. 이것이 최우선입니다.
+4. **기존 파일이 없을 때만** 새 폴더/파일을 생성하세요. 적절한 폴더가 없으면 새 폴더 구조를 만든 후 add_file로 파일을 생성하세요.
+5. **구조 정리**: 파일을 추가/수정한 후, 주변 폴더/파일명이 새 내용과 어울리지 않으면 edit_folder_name, edit_file_name, move_file로 조정하세요. 단, 기존 내용은 절대 유실하지 마세요.
+6. **완료 전 점검**: add_file 또는 edit_file을 최소 1회 이상 호출했는지 확인하세요. 하지 않았다면 반드시 파일을 생성/수정한 후 complete()를 호출하세요.
+7. 한국어로 노트를 작성하세요.
 
 ## 콘텐츠 품질 원칙 (핵심 — 반드시 따르세요)
 
@@ -317,24 +316,22 @@ italic: { "type": "text", "text": "기울임", "styles": { "italic": true } }
   if (type === 'SEARCH') {
     return basePrompt + `
 ## 사용 가능한 도구
-- list_folder(path): 해당 폴더의 직계 자식(폴더+파일)만 조회. "/" = 루트.
-- read_file(path): 파일 내용 읽기
+- read_file(path): 파일 내용 읽기. 위 트리의 [경로]를 사용하세요.
+- list_folder(path): 트리에 없는 최신 정보가 필요할 때만 사용 (대부분 불필요)
 - complete(summary, searchResults): 검색 완료
 
-## 검색 절차 (Recursive Drill-Down — 반드시 따르세요)
-대규모 트리에서 효율적으로 검색하려면 다음 패턴을 사용하세요:
+## 검색 절차 (Tree-Based Search — 반드시 따르세요)
+전체 트리가 위에 제공되어 있습니다. list_folder를 반복 호출할 필요가 없습니다.
 
-1. **루트 탐색**: list_folder("/")로 최상위 폴더 목록 확인
-2. **관련 폴더 선택**: 검색 쿼리와 관련 있어 보이는 폴더명을 골라 list_folder로 한 단계 deeper
-3. **반복 drill-down**: 하위 폴더 중 관련 있는 것을 계속 list_folder로 탐색
-4. **파일 발견**: 제목이 관련 있어 보이는 파일을 read_file로 내용 확인
-5. **결과 수집**: 관련성 높은 파일들을 searchResults에 담아 complete() 호출
+1. **트리 분석**: 위 전체 트리에서 검색 쿼리와 관련 있는 폴더명/파일명을 찾으세요.
+2. **파일 선택**: 제목(파일명)이 관련 있어 보이는 파일의 [경로]를 확인하세요.
+3. **내용 확인**: read_file(경로)로 파일 내용을 읽어 관련성을 확인하세요.
+4. **결과 수집**: 관련성 높은 파일들을 searchResults에 담아 complete() 호출
 
-주의:
-- 전체 트리를 한번에 볼 수 없습니다. 반드시 list_folder로 한 단계씩 탐색하세요.
-- 폴더명으로 1차 필터링 → 파일명으로 2차 필터링 → 내용으로 3차 확인
-- 관련 없는 폴더는 건너뛰어 토큰을 절약하세요.
-- 최소 2-3개 관련 폴더를 탐색하세요.
+검색 전략:
+- 폴더명/파일명으로 1차 필터링 → 내용으로 2차 확인
+- 관련 있어 보이는 파일 2~5개를 read_file로 확인하세요.
+- 파일명만으로 관련성이 낮아 보이면 건너뛰세요.
 
 ## searchResults 형식
 [
@@ -346,10 +343,10 @@ italic: { "type": "text", "text": "기울임", "styles": { "italic": true } }
   // REFACTOR
   return basePrompt + `
 ## 사용 가능한 도구
-- list_folder(path): 해당 폴더의 직계 자식(폴더+파일)만 조회
+- read_file(path): 파일 내용 읽기. 위 트리의 [경로]를 사용하세요.
+- list_folder(path): 트리에 없는 최신 정보가 필요할 때만 사용 (대부분 불필요)
 - add_folder(path): 새 폴더 생성
 - add_file(path, content): 새 파일 생성
-- read_file(path): 파일 내용 읽기
 - edit_file(path, before, after): 파일 내용 수정
 - move_file(fromPath, toPath): 파일 이동
 - delete_file(path): 파일 삭제 (휴지통으로)
@@ -357,8 +354,8 @@ italic: { "type": "text", "text": "기울임", "styles": { "italic": true } }
 - complete(summary): 작업 완료
 
 ## 리팩토링 절차
-1. list_folder("/")로 루트 구조를 확인하세요.
-2. 각 폴더를 list_folder로 탐색하여 현재 구조를 파악하세요.
+1. **위 전체 트리를 먼저 분석하세요.** list_folder를 호출할 필요 없이 현재 구조를 파악할 수 있습니다.
+2. 필요한 파일이 있으면 read_file로 내용을 확인하세요.
 3. 최적의 계층 구조를 설계하세요 (대분류 → 소분류 → 파일).
 4. move_file, add_folder 등으로 구조를 개선하세요.
 5. 내용이 유실되지 않도록 주의하세요.
@@ -737,33 +734,89 @@ export async function runAgentLoop(
 }
 
 /**
- * 공간의 트리 구조 문자열 생성
+ * 공간의 전체 트리 구조 문자열 생성 (파일명까지 포함)
+ *
+ * 성능 최적화: 한 번의 쿼리로 전체 폴더/파일을 가져와서 메모리에서 트리 구성
+ * LLM이 list_folder를 반복 호출하지 않고 트리에서 바로 파일 경로를 선택할 수 있음
  */
 async function getTreeStructure(spaceId: string): Promise<string> {
-  // 루트 직계 자식만 반환 (전체 트리를 덤프하지 않음 — 스케일링 대응)
-  const rootFolders = await prisma.folder.findMany({
-    where: { spaceId, parentId: null },
-    orderBy: { name: 'asc' },
-    select: { name: true, path: true },
-  });
+  // 전체 폴더와 파일을 한 번에 조회
+  const [allFolders, allFiles] = await Promise.all([
+    prisma.folder.findMany({
+      where: { spaceId },
+      orderBy: { path: 'asc' },
+      select: { id: true, name: true, path: true, parentId: true },
+    }),
+    prisma.file.findMany({
+      where: { spaceId, deletedAt: null },
+      orderBy: { path: 'asc' },
+      select: { id: true, name: true, path: true, folderId: true },
+    }),
+  ]);
 
-  const rootFiles = await prisma.file.findMany({
-    where: { spaceId, folderId: null, deletedAt: null },
-    orderBy: { name: 'asc' },
-    select: { name: true, path: true },
-  });
+  if (allFolders.length === 0 && allFiles.length === 0) {
+    return '(빈 공간 - 아직 노트가 없습니다)';
+  }
 
+  // 대규모 데이터 처리: 폴더+파일이 500개 초과 시 루트만 반환 (기존 방식으로 폴백)
+  const totalItems = allFolders.length + allFiles.length;
+  if (totalItems > 500) {
+    console.log(`[Agent] Large tree detected (${totalItems} items), returning root only`);
+    const rootFolders = allFolders.filter(f => f.parentId === null);
+    const rootFiles = allFiles.filter(f => f.folderId === null);
+
+    const lines: string[] = [];
+    for (const folder of rootFolders) {
+      lines.push(`📁 ${folder.name}/ [${folder.path}]`);
+    }
+    for (const file of rootFiles) {
+      lines.push(`📄 ${file.name} [${file.path}]`);
+    }
+
+    return lines.join('\n') + '\n\n⚠️ 파일이 많아 루트만 표시됩니다. list_folder(경로)로 하위 내용을 확인하세요.';
+  }
+
+  // 폴더 ID → 하위 폴더 목록
+  const childFoldersMap = new Map<string | null, typeof allFolders>();
+  for (const folder of allFolders) {
+    const parentKey = folder.parentId;
+    if (!childFoldersMap.has(parentKey)) {
+      childFoldersMap.set(parentKey, []);
+    }
+    childFoldersMap.get(parentKey)!.push(folder);
+  }
+
+  // 폴더 ID → 하위 파일 목록
+  const childFilesMap = new Map<string | null, typeof allFiles>();
+  for (const file of allFiles) {
+    const folderKey = file.folderId;
+    if (!childFilesMap.has(folderKey)) {
+      childFilesMap.set(folderKey, []);
+    }
+    childFilesMap.get(folderKey)!.push(file);
+  }
+
+  // 재귀적으로 트리 문자열 생성
   const lines: string[] = [];
 
-  for (const folder of rootFolders) {
-    lines.push(`📁 ${folder.name}/`);
+  function buildTree(parentId: string | null, indent: string): void {
+    // 현재 레벨의 폴더들
+    const folders = childFoldersMap.get(parentId) || [];
+    for (const folder of folders) {
+      lines.push(`${indent}📁 ${folder.name}/ [${folder.path}]`);
+      buildTree(folder.id, indent + '  ');
+    }
+
+    // 현재 레벨의 파일들
+    const files = childFilesMap.get(parentId) || [];
+    for (const file of files) {
+      lines.push(`${indent}📄 ${file.name} [${file.path}]`);
+    }
   }
 
-  for (const file of rootFiles) {
-    lines.push(`📄 ${file.name}`);
-  }
+  buildTree(null, '');
 
-  return lines.join('\n') || '(빈 공간 - 아직 노트가 없습니다)';
+  return lines.join('\n');
 }
 
 /**
